@@ -1,26 +1,33 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { io } from "socket.io-client";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
+import { configureApp } from "../src/app.setup.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { FakePrisma, FakeRedis } from "./fakes.js";
 
-const ADMIN_KEY = "e2e-admin-key-0123456789";
+const ADMIN = { email: "admin@example.com", password: "admin-password-1" };
 const customer = {
 	customerName: "Ada Lovelace",
 	address: "12 Analytical Way",
 	phone: "+44 20 7946 0000",
 };
+const UNKNOWN_ID = "6b0c2d8e-0000-4000-8000-000000000000";
 
 describe("API (e2e)", () => {
 	let app: INestApplication;
 	let prisma: FakePrisma;
 	let pizzaId: string;
 	let http: ReturnType<typeof request>;
+	let baseUrl: string;
+	let emailCounter = 0;
 
 	beforeAll(async () => {
-		process.env.ADMIN_API_KEY = ADMIN_KEY;
+		process.env.JWT_SECRET = "e2e-secret-e2e-secret-e2e-secret-1234";
+		process.env.ADMIN_EMAIL = ADMIN.email;
+		process.env.ADMIN_PASSWORD = ADMIN.password;
 		process.env.ORDER_STEP_MS = "3600000"; // keep the simulator out of the way
 		prisma = new FakePrisma();
 		pizzaId = prisma.addMenuItem({ name: "Pizza", priceCents: 1000 }).id;
@@ -33,27 +40,59 @@ describe("API (e2e)", () => {
 			.useValue(new FakeRedis())
 			.compile();
 		app = moduleRef.createNestApplication();
-		app.setGlobalPrefix("/api/v1");
+		configureApp(app);
 		await app.init();
-		http = request(app.getHttpServer());
+		await app.listen(0, "127.0.0.1");
+		baseUrl = await app.getUrl();
+		http = request(baseUrl);
 	});
 
 	afterAll(async () => {
 		await app.close();
-		delete process.env.ADMIN_API_KEY;
-		delete process.env.ORDER_STEP_MS;
+		for (const key of [
+			"JWT_SECRET",
+			"ADMIN_EMAIL",
+			"ADMIN_PASSWORD",
+			"ORDER_STEP_MS",
+		])
+			delete process.env[key];
 	});
 
+	const cookieFrom = (response: request.Response) =>
+		(response.headers["set-cookie"] as unknown as string[])[0]?.split(";")[0] ??
+		"";
+
+	/** Registers a fresh customer and returns their session cookie. */
+	async function signUp(name = "Ada") {
+		const email = `user${++emailCounter}@example.com`;
+		const response = await http
+			.post("/api/v1/auth/register")
+			.send({ name, email, password: "analytical-engine" })
+			.expect(201);
+		return {
+			cookie: cookieFrom(response),
+			user: response.body as { id: string; email: string },
+		};
+	}
+
+	async function signInAdmin() {
+		const response = await http
+			.post("/api/v1/auth/login")
+			.send(ADMIN)
+			.expect(200);
+		return cookieFrom(response);
+	}
+
 	const placeOrder = (
+		cookie: string,
 		body: object = { ...customer, items: [{ menuItemId: pizzaId, quantity: 2 }] },
-	) => http.post("/api/v1/orders").send(body);
-	const admin = { "x-admin-key": ADMIN_KEY };
+	) => http.post("/api/v1/orders").set("Cookie", cookie).send(body);
 
 	describe("health + menu", () => {
 		it("GET /api/v1 is healthy", () =>
 			http.get("/api/v1").expect(200, { status: "ok" }));
 
-		it("GET /api/v1/menu lists menu items", async () => {
+		it("GET /api/v1/menu is public", async () => {
 			const { body } = await http.get("/api/v1/menu").expect(200);
 			expect(body).toHaveLength(2);
 			expect(body[0]).toEqual(
@@ -65,9 +104,123 @@ describe("API (e2e)", () => {
 		});
 	});
 
+	describe("auth", () => {
+		it("registers, sets an httpOnly session cookie and never leaks the hash", async () => {
+			const response = await http
+				.post("/api/v1/auth/register")
+				.send({
+					name: "Grace Hopper",
+					email: "Grace@Example.com",
+					password: "compiler-first",
+				})
+				.expect(201);
+
+			expect(response.body).toEqual({
+				id: expect.any(String),
+				email: "grace@example.com",
+				name: "Grace Hopper",
+				role: "CUSTOMER",
+			});
+			const setCookie =
+				(response.headers["set-cookie"] as unknown as string[])[0] ?? "";
+			expect(setCookie).toMatch(/^access_token=/);
+			expect(setCookie).toMatch(/HttpOnly/i);
+			expect(setCookie).toMatch(/SameSite=Lax/i);
+			expect(JSON.stringify(response.body)).not.toMatch(/password|hash/i);
+		});
+
+		it("409s on a duplicate email, case-insensitively", async () => {
+			const { user } = await signUp();
+			await http
+				.post("/api/v1/auth/register")
+				.send({
+					name: "Again",
+					email: user.email.toUpperCase(),
+					password: "analytical-engine",
+				})
+				.expect(409);
+		});
+
+		it.each([
+			[
+				"bad email",
+				{ name: "Ada", email: "not-an-email", password: "analytical-engine" },
+			],
+			[
+				"short password",
+				{ name: "Ada", email: "a@example.com", password: "short" },
+			],
+			[
+				"short name",
+				{ name: "A", email: "a@example.com", password: "analytical-engine" },
+			],
+			["missing fields", {}],
+		])("400s on register with %s", async (_label, payload) => {
+			await http.post("/api/v1/auth/register").send(payload).expect(400);
+		});
+
+		it("logs in, and answers wrong passwords and unknown emails identically", async () => {
+			const { user } = await signUp();
+			const ok = await http
+				.post("/api/v1/auth/login")
+				.send({ email: user.email, password: "analytical-engine" })
+				.expect(200);
+			expect(ok.body).toMatchObject({ email: user.email, role: "CUSTOMER" });
+			expect(cookieFrom(ok)).toMatch(/^access_token=/);
+
+			const wrong = await http
+				.post("/api/v1/auth/login")
+				.send({ email: user.email, password: "wrong-password" })
+				.expect(401);
+			const unknown = await http
+				.post("/api/v1/auth/login")
+				.send({ email: "nobody@example.com", password: "wrong-password" })
+				.expect(401);
+			expect(unknown.body.message).toBe(wrong.body.message);
+		});
+
+		it("GET /auth/me needs a valid session", async () => {
+			const { cookie, user } = await signUp();
+			await http.get("/api/v1/auth/me").expect(401);
+			await http.get("/api/v1/auth/me").set("Cookie", `${cookie}x`).expect(401);
+			await http
+				.get("/api/v1/auth/me")
+				.set("Cookie", cookie)
+				.expect(200)
+				.expect((res) => expect(res.body.email).toBe(user.email));
+		});
+
+		it("logout clears the cookie", async () => {
+			const { cookie } = await signUp();
+			const response = await http
+				.post("/api/v1/auth/logout")
+				.set("Cookie", cookie)
+				.expect(204);
+			expect((response.headers["set-cookie"] as unknown as string[])[0]).toMatch(
+				/access_token=;/,
+			);
+		});
+
+		it("the seeded admin can sign in with the ADMIN role", async () => {
+			const response = await http
+				.post("/api/v1/auth/login")
+				.send(ADMIN)
+				.expect(200);
+			expect(response.body.role).toBe("ADMIN");
+		});
+	});
+
 	describe("POST /orders", () => {
-		it("creates an order priced from the menu", async () => {
-			const { body } = await placeOrder().expect(201);
+		it("requires sign-in", () =>
+			http
+				.post("/api/v1/orders")
+				.send({ ...customer, items: [{ menuItemId: pizzaId, quantity: 1 }] })
+				.expect(401));
+
+		it("creates an order owned by the user, priced from the menu", async () => {
+			const { cookie, user } = await signUp();
+			const { body } = await placeOrder(cookie).expect(201);
+
 			expect(body).toMatchObject({
 				status: "RECEIVED",
 				totalCents: 2000,
@@ -76,138 +229,177 @@ describe("API (e2e)", () => {
 			expect(body.items).toEqual([
 				{ menuItemId: pizzaId, name: "Pizza", priceCents: 1000, quantity: 2 },
 			]);
+			expect(prisma.orders.find((order) => order.id === body.id)?.userId).toBe(
+				user.id,
+			);
 		});
 
-		it("ignores client-supplied prices and totals", async () => {
-			const { body } = await placeOrder({
+		it("ignores client-supplied prices, totals and owners", async () => {
+			const { cookie, user } = await signUp();
+			const { body } = await placeOrder(cookie, {
 				...customer,
 				totalCents: 1,
+				userId: "someone-else",
 				items: [{ menuItemId: pizzaId, quantity: 1, priceCents: 1 }],
 			}).expect(201);
+
 			expect(body.totalCents).toBe(1000);
+			expect(prisma.orders.find((order) => order.id === body.id)?.userId).toBe(
+				user.id,
+			);
 		});
 
 		it.each([
-			[
-				"missing name",
-				{
-					...customer,
-					customerName: "",
-					items: [{ menuItemId: "x", quantity: 1 }],
-				},
-			],
+			["missing name", { ...customer, customerName: "" }],
 			["short address", { ...customer, address: "abc" }],
 			["bad phone", { ...customer, phone: "call me" }],
 			["no items", { ...customer, items: [] }],
 			[
 				"zero quantity",
-				{
-					...customer,
-					items: [
-						{ menuItemId: "6b0c2d8e-0000-4000-8000-000000000000", quantity: 0 },
-					],
-				},
+				{ ...customer, items: [{ menuItemId: UNKNOWN_ID, quantity: 0 }] },
 			],
 			[
 				"huge quantity",
-				{
-					...customer,
-					items: [
-						{ menuItemId: "6b0c2d8e-0000-4000-8000-000000000000", quantity: 21 },
-					],
-				},
+				{ ...customer, items: [{ menuItemId: UNKNOWN_ID, quantity: 21 }] },
 			],
 			[
 				"fractional quantity",
-				{
-					...customer,
-					items: [
-						{ menuItemId: "6b0c2d8e-0000-4000-8000-000000000000", quantity: 1.5 },
-					],
-				},
+				{ ...customer, items: [{ menuItemId: UNKNOWN_ID, quantity: 1.5 }] },
 			],
 			[
 				"non-uuid item id",
 				{ ...customer, items: [{ menuItemId: "pizza", quantity: 1 }] },
 			],
 		])("400s on %s", async (_label, payload) => {
-			await http.post("/api/v1/orders").send(payload).expect(400);
+			const { cookie } = await signUp();
+			await http
+				.post("/api/v1/orders")
+				.set("Cookie", cookie)
+				.send(payload)
+				.expect(400);
 		});
 
-		it("400s on duplicate menu items", () =>
-			placeOrder({
+		it("400s on duplicate menu items and 422s on unknown ones", async () => {
+			const { cookie } = await signUp();
+			await placeOrder(cookie, {
 				...customer,
 				items: [
 					{ menuItemId: pizzaId, quantity: 1 },
 					{ menuItemId: pizzaId, quantity: 1 },
 				],
-			}).expect(400));
-
-		it("422s on unknown menu items", () =>
-			placeOrder({
+			}).expect(400);
+			await placeOrder(cookie, {
 				...customer,
-				items: [
-					{ menuItemId: "6b0c2d8e-0000-4000-8000-000000000000", quantity: 1 },
-				],
-			}).expect(422));
+				items: [{ menuItemId: UNKNOWN_ID, quantity: 1 }],
+			}).expect(422);
+		});
 	});
 
-	describe("GET /orders/:id", () => {
-		it("returns an order by id", async () => {
-			const { body: created } = await placeOrder().expect(201);
-			const { body } = await http.get(`/api/v1/orders/${created.id}`).expect(200);
-			expect(body).toEqual(created);
+	describe("reading orders", () => {
+		it("lets owners and admins read an order and hides it from everyone else", async () => {
+			const owner = await signUp();
+			const stranger = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: order } = await placeOrder(owner.cookie).expect(201);
+			const url = `/api/v1/orders/${order.id}`;
+
+			await http.get(url).expect(401);
+			await http.get(url).set("Cookie", owner.cookie).expect(200, order);
+			await http.get(url).set("Cookie", adminCookie).expect(200, order);
+			await http.get(url).set("Cookie", stranger.cookie).expect(404);
 		});
 
-		it("404s for unknown ids and 400s for malformed ids", async () => {
+		it("404s unknown ids and 400s malformed ids", async () => {
+			const { cookie } = await signUp();
 			await http
-				.get("/api/v1/orders/6b0c2d8e-0000-4000-8000-000000000000")
+				.get(`/api/v1/orders/${UNKNOWN_ID}`)
+				.set("Cookie", cookie)
 				.expect(404);
-			await http.get("/api/v1/orders/not-a-uuid").expect(400);
+			await http
+				.get("/api/v1/orders/not-a-uuid")
+				.set("Cookie", cookie)
+				.expect(400);
+		});
+
+		it("GET /orders/mine returns only the caller's orders", async () => {
+			const me = await signUp();
+			const other = await signUp();
+			const { body: mine } = await placeOrder(me.cookie).expect(201);
+			await placeOrder(other.cookie).expect(201);
+
+			await http.get("/api/v1/orders/mine").expect(401);
+			const { body } = await http
+				.get("/api/v1/orders/mine")
+				.set("Cookie", me.cookie)
+				.expect(200);
+			expect(body.map((order: { id: string }) => order.id)).toEqual([mine.id]);
 		});
 	});
 
 	describe("admin endpoints", () => {
-		it("require the admin key", async () => {
-			const { body: order } = await placeOrder().expect(201);
+		it("reject anonymous callers with 401 and customers with 403", async () => {
+			const { cookie } = await signUp();
+			const { body: order } = await placeOrder(cookie).expect(201);
+
 			await http.get("/api/v1/orders").expect(401);
-			await http.get("/api/v1/orders").set("x-admin-key", "wrong").expect(401);
+			await http.get("/api/v1/orders").set("Cookie", cookie).expect(403);
 			await http
 				.patch(`/api/v1/orders/${order.id}/status`)
-				.send({ status: "PREPARING" })
+				.set("Cookie", cookie)
+				.send({ status: "CANCELLED" })
+				.expect(403);
+			await http
+				.delete(`/api/v1/orders/${order.id}`)
+				.set("Cookie", cookie)
+				.expect(403);
+			await http
+				.patch(`/api/v1/orders/${order.id}/status`)
+				.send({ status: "CANCELLED" })
 				.expect(401);
-			await http.delete(`/api/v1/orders/${order.id}`).expect(401);
 		});
 
-		it("GET /orders lists, filters by status and validates the query", async () => {
-			const { body: order } = await placeOrder().expect(201);
+		it("GET /orders lists everything, filters by status and validates the query", async () => {
+			const { cookie } = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: order } = await placeOrder(cookie).expect(201);
 			await http
 				.patch(`/api/v1/orders/${order.id}/status`)
-				.set(admin)
+				.set("Cookie", adminCookie)
 				.send({ status: "CANCELLED" })
 				.expect(200);
 
-			const all = await http.get("/api/v1/orders").set(admin).expect(200);
+			const all = await http
+				.get("/api/v1/orders")
+				.set("Cookie", adminCookie)
+				.expect(200);
 			expect(all.body.length).toBeGreaterThan(1);
 			const cancelled = await http
 				.get("/api/v1/orders?status=CANCELLED")
-				.set(admin)
+				.set("Cookie", adminCookie)
 				.expect(200);
 			expect(
 				cancelled.body.every((o: { status: string }) => o.status === "CANCELLED"),
 			).toBe(true);
-			await http.get("/api/v1/orders?status=BOGUS").set(admin).expect(400);
+			await http
+				.get("/api/v1/orders?status=BOGUS")
+				.set("Cookie", adminCookie)
+				.expect(400);
 			await http
 				.get("/api/v1/orders?limit=1")
-				.set(admin)
+				.set("Cookie", adminCookie)
 				.expect(200)
 				.expect((res) => expect(res.body).toHaveLength(1));
 		});
 
-		it("PATCH /orders/:id/status walks the lifecycle and rejects bad transitions", async () => {
-			const { body: order } = await placeOrder().expect(201);
+		it("PATCH walks the lifecycle and rejects bad transitions", async () => {
+			const { cookie } = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: order } = await placeOrder(cookie).expect(201);
 			const patch = (status: string) =>
-				http.patch(`/api/v1/orders/${order.id}/status`).set(admin).send({ status });
+				http
+					.patch(`/api/v1/orders/${order.id}/status`)
+					.set("Cookie", adminCookie)
+					.send({ status });
 
 			await patch("PREPARING")
 				.expect(200)
@@ -218,42 +410,55 @@ describe("API (e2e)", () => {
 			await patch("PREPARING").expect(409);
 			await patch("NOPE").expect(400);
 			await http
-				.patch("/api/v1/orders/6b0c2d8e-0000-4000-8000-000000000000/status")
-				.set(admin)
+				.patch(`/api/v1/orders/${UNKNOWN_ID}/status`)
+				.set("Cookie", adminCookie)
 				.send({ status: "PREPARING" })
 				.expect(404);
 		});
 
-		it("DELETE /orders/:id removes the order", async () => {
-			const { body: order } = await placeOrder().expect(201);
-			await http.delete(`/api/v1/orders/${order.id}`).set(admin).expect(204);
-			await http.get(`/api/v1/orders/${order.id}`).expect(404);
-			await http.delete(`/api/v1/orders/${order.id}`).set(admin).expect(404);
+		it("DELETE removes the order", async () => {
+			const { cookie } = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: order } = await placeOrder(cookie).expect(201);
+
+			await http
+				.delete(`/api/v1/orders/${order.id}`)
+				.set("Cookie", adminCookie)
+				.expect(204);
+			await http
+				.get(`/api/v1/orders/${order.id}`)
+				.set("Cookie", cookie)
+				.expect(404);
+			await http
+				.delete(`/api/v1/orders/${order.id}`)
+				.set("Cookie", adminCookie)
+				.expect(404);
 		});
 	});
 
 	describe("GET /orders/:id/events (SSE)", () => {
-		it("404s before opening the stream for unknown orders", () =>
-			http
-				.get("/api/v1/orders/6b0c2d8e-0000-4000-8000-000000000000/events")
-				.expect(404));
+		it("rejects anonymous callers and hides other users' orders", async () => {
+			const owner = await signUp();
+			const stranger = await signUp();
+			const { body: order } = await placeOrder(owner.cookie).expect(201);
+
+			await http.get(`/api/v1/orders/${order.id}/events`).expect(401);
+			await http
+				.get(`/api/v1/orders/${order.id}/events`)
+				.set("Cookie", stranger.cookie)
+				.expect(404);
+		});
 
 		it("streams the current status then live updates until the order is final", async () => {
-			const { body: order } = await placeOrder().expect(201);
-			const address =
-				app.getHttpServer().address() ??
-				(await new Promise((resolve) =>
-					app
-						.getHttpServer()
-						.listen(0, () => resolve(app.getHttpServer().address())),
-				));
-			const { port } = address as { port: number };
+			const owner = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: order } = await placeOrder(owner.cookie).expect(201);
 
-			const response = await fetch(
-				`http://127.0.0.1:${port}/api/v1/orders/${order.id}/events`,
-			);
+			const response = await fetch(`${baseUrl}/api/v1/orders/${order.id}/events`, {
+				headers: { cookie: owner.cookie },
+			});
 			expect(response.headers.get("content-type")).toContain("text/event-stream");
-			const reader = response.body!.getReader();
+			const reader = (response.body as ReadableStream<Uint8Array>).getReader();
 			const decoder = new TextDecoder();
 			let received = "";
 			const readUntil = async (marker: string) => {
@@ -267,13 +472,55 @@ describe("API (e2e)", () => {
 			await readUntil('"status":"RECEIVED"');
 			await http
 				.patch(`/api/v1/orders/${order.id}/status`)
-				.set(admin)
+				.set("Cookie", adminCookie)
 				.send({ status: "CANCELLED" })
 				.expect(200);
 			await readUntil('"status":"CANCELLED"');
 			const { done } = await reader.read(); // stream completes after the final status
 			expect(done).toBe(true);
 			expect(received).toContain("event: order");
+		});
+	});
+
+	describe("admin websocket", () => {
+		const connect = (cookie?: string) =>
+			io(`${baseUrl}/admin`, {
+				transports: ["websocket"],
+				extraHeaders: cookie ? { cookie } : {},
+				reconnection: false,
+			});
+		const once = <T>(socket: ReturnType<typeof io>, event: string) =>
+			new Promise<T>((resolve) => socket.once(event, resolve));
+
+		it("pushes order changes to a signed-in admin", async () => {
+			const adminCookie = await signInAdmin();
+			const { cookie } = await signUp();
+			const socket = connect(adminCookie);
+			await once(socket, "connect");
+			await new Promise((resolve) => setTimeout(resolve, 50)); // let the server finish joining the admins room
+
+			const received = once<{ type: string; order: { status: string } }>(
+				socket,
+				"order",
+			);
+			await placeOrder(cookie).expect(201);
+
+			expect(await received).toMatchObject({
+				type: "created",
+				order: { status: "RECEIVED" },
+			});
+			socket.disconnect();
+		});
+
+		it.each([
+			["no cookie", undefined],
+			["a customer session", "customer"],
+		])("turns away %s", async (_label, who) => {
+			const cookie = who ? (await signUp()).cookie : undefined;
+			const socket = connect(cookie);
+			const unauthorized = once(socket, "unauthorized");
+			const disconnected = once(socket, "disconnect");
+			await Promise.all([unauthorized, disconnected]);
 		});
 	});
 });

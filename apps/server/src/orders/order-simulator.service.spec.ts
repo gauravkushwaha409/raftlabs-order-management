@@ -5,6 +5,7 @@ import { OrderEventsService } from "./order-events.service.js";
 import { OrderSimulatorService } from "./order-simulator.service.js";
 import { OrdersService } from "./orders.service.js";
 
+const USER_ID = "user-1";
 const customer = {
 	customerName: "Ada Lovelace",
 	address: "12 Analytical Way",
@@ -36,7 +37,7 @@ describe("OrderSimulatorService", () => {
 
 	it("walks a new order through every status", async () => {
 		const { orders, simulator, pizza } = await setup();
-		const { id } = await orders.create({
+		const { id } = await orders.create(USER_ID, {
 			...customer,
 			items: [{ menuItemId: pizza.id, quantity: 1 }],
 		});
@@ -53,7 +54,7 @@ describe("OrderSimulatorService", () => {
 
 	it("stops advancing a cancelled order", async () => {
 		const { orders, simulator, pizza } = await setup();
-		const { id } = await orders.create({
+		const { id } = await orders.create(USER_ID, {
 			...customer,
 			items: [{ menuItemId: pizza.id, quantity: 1 }],
 		});
@@ -67,7 +68,7 @@ describe("OrderSimulatorService", () => {
 
 	it("does not double-advance when an admin moved the order meanwhile", async () => {
 		const { orders, simulator, pizza } = await setup();
-		const { id } = await orders.create({
+		const { id } = await orders.create(USER_ID, {
 			...customer,
 			items: [{ menuItemId: pizza.id, quantity: 1 }],
 		});
@@ -83,7 +84,7 @@ describe("OrderSimulatorService", () => {
 
 	it("resumes unfinished orders after a restart", async () => {
 		const { prisma, orders, pizza } = await setup();
-		const { id } = await orders.create({
+		const { id } = await orders.create(USER_ID, {
 			...customer,
 			items: [{ menuItemId: pizza.id, quantity: 1 }],
 		});

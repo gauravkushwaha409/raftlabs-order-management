@@ -15,6 +15,7 @@ import {
 	switchMap,
 	takeWhile,
 } from "rxjs";
+import type { AuthUser } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type { CreateOrderDto } from "./order.dto.js";
 import { type OrderView, toOrderView } from "./order.view.js";
@@ -35,7 +36,7 @@ export class OrdersService {
 		private readonly events: OrderEventsService,
 	) {}
 
-	async create(dto: CreateOrderDto): Promise<OrderView> {
+	async create(userId: string, dto: CreateOrderDto): Promise<OrderView> {
 		const menuItems = await this.prisma.menuItem.findMany({
 			where: {
 				id: { in: dto.items.map((item) => item.menuItemId) },
@@ -62,6 +63,7 @@ export class OrdersService {
 
 		const order = await this.prisma.order.create({
 			data: {
+				userId,
 				customerName: dto.customerName,
 				address: dto.address,
 				phone: dto.phone,
@@ -81,15 +83,28 @@ export class OrdersService {
 
 	async list(filter: {
 		status?: OrderStatus;
+		userId?: string;
 		limit: number;
 	}): Promise<OrderView[]> {
 		const orders = await this.prisma.order.findMany({
-			where: filter.status ? { status: filter.status } : undefined,
+			where: { status: filter.status, userId: filter.userId },
 			orderBy: { createdAt: "desc" },
 			take: filter.limit,
 			include: withItems,
 		});
 		return orders.map(toOrderView);
+	}
+
+	/** An order as seen by `user`: owners and admins see it, everyone else gets the same 404 as a missing id. */
+	async getFor(user: AuthUser, id: string): Promise<OrderView> {
+		const order = await this.prisma.order.findUnique({
+			where: { id },
+			include: withItems,
+		});
+		if (!order || (user.role !== "ADMIN" && order.userId !== user.id)) {
+			throw new NotFoundException(`Order ${id} not found`);
+		}
+		return toOrderView(order);
 	}
 
 	async get(id: string): Promise<OrderView> {
