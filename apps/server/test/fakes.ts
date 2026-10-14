@@ -4,11 +4,13 @@ import type {
 	MenuItem,
 	Order,
 	OrderItem,
+	User,
 } from "../src/generated/prisma/client.js";
 import type { OrderStatus } from "../src/orders/order-status.js";
 
 type OrderRecord = Order & { items: OrderItem[] };
 type Where = {
+	userId?: string;
 	id?: string | { in: string[] };
 	status?: OrderStatus | { notIn: OrderStatus[] };
 	available?: boolean;
@@ -29,6 +31,11 @@ const matches = (
 		where.status.notIn.includes(record.status)
 	)
 		return false;
+	if (
+		where.userId !== undefined &&
+		(record as { userId?: string }).userId !== where.userId
+	)
+		return false;
 	if (where.available !== undefined && record.available !== where.available)
 		return false;
 	return true;
@@ -45,6 +52,28 @@ const pick = <T extends object>(record: T, select?: Record<string, boolean>) =>
 export class FakePrisma {
 	menuItems: MenuItem[] = [];
 	orders: OrderRecord[] = [];
+	users: User[] = [];
+
+	user = {
+		findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
+			this.users.find((user) =>
+				where.id ? user.id === where.id : user.email === where.email,
+			) ?? null,
+		create: async ({
+			data,
+		}: {
+			data: Pick<User, "email" | "name" | "passwordHash"> & Partial<User>;
+		}) => {
+			const user: User = {
+				id: randomUUID(),
+				role: "CUSTOMER",
+				createdAt: new Date(),
+				...data,
+			};
+			this.users.push(user);
+			return user;
+		},
+	};
 
 	menuItem = {
 		count: async () => this.menuItems.length,
@@ -128,6 +157,19 @@ export class FakePrisma {
 			this.orders = this.orders.filter((order) => order.id !== where.id);
 		},
 	};
+
+	addUser(user: Partial<User> & Pick<User, "email">): User {
+		const created: User = {
+			id: randomUUID(),
+			name: "Test User",
+			passwordHash: "unused",
+			role: "CUSTOMER",
+			createdAt: new Date(),
+			...user,
+		};
+		this.users.push(created);
+		return created;
+	}
 
 	addMenuItem(
 		item: Partial<MenuItem> & Pick<MenuItem, "name" | "priceCents">,
