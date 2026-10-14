@@ -5,8 +5,8 @@ Turborepo monorepo (pnpm 12, Node 24+): a food-ordering feature with menu, cart,
 | Path | What |
 | --- | --- |
 | `apps/server` | NestJS 12 REST API (`/api/v1`, Swagger at `/api/v1/docs`), Prisma 7 + Postgres, Redis pub/sub, SSE + socket.io, Zod validation |
-| `apps/app` | Customer app: menu, cart, checkout, live order tracking (React 19, Vite 8, TanStack Router/Query, Zustand, Tailwind 4) |
-| `apps/admin` | Admin dashboard: live orders table, status updates, delete (key-protected) |
+| `apps/app` | Customer app: menu, cart, sign-up/sign-in, checkout, my orders, live order tracking (React 19, Vite 8, TanStack Router/Query, Zustand, Tailwind 4) |
+| `apps/admin` | Admin dashboard: sign-in, live orders table, status updates, delete (admin accounts only) |
 | `packages/ui` | shadcn-based design system + Tailwind theme (`@package/ui/global.css`), lucide icons |
 | `packages/query` | TanStack Query client/provider (localStorage persistence) + `useQuery`/`useMutation` wrappers |
 | `packages/form` | react-hook-form + Zod wrappers (`FormInput`, `FormTextarea`, ...) |
@@ -22,28 +22,39 @@ pnpm prisma:deploy && pnpm dev             # run apps on the host
 ```
 
 Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`.
-Admin sign-in key: `ADMIN_API_KEY` in the env file (default `dev-admin-key-change-me`; change it outside dev).
-The menu is seeded automatically on first start when the table is empty.
+The menu is seeded on first start when the table is empty. The first admin account is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in the env file (dev default `admin@example.com` / `change-me-admin-password`; change both and `JWT_SECRET` outside dev).
+
+## Auth
+
+- Email + password accounts (`User` table, roles `CUSTOMER` / `ADMIN`). Passwords are hashed with scrypt and a per-password salt.
+- Sessions are a signed JWT in an **httpOnly** cookie (`access_token`, 7 days), so page scripts can never read it. The user is re-read from the DB on every request, so deleted or demoted accounts lose access immediately.
+- Apps on a different site than the API: set `COOKIE_SAME_SITE=none` (forces `Secure`) and list the app origins in `VITE_APP_URL` / `VITE_ADMIN_URL` / `CORS_ORIGINS`. All API bodies are JSON, so cross-origin writes need a CORS preflight, which only allow-listed origins pass.
+- Login and register are limited to 10 requests/min per IP, everything else to 100/min. Behind a reverse proxy set `TRUST_PROXY=1`.
+- Customers must be signed in to order and can only see their own orders (anyone else gets a 404, also on the SSE stream). Admins see everything. The admin app only accepts `ADMIN` accounts.
 
 ## API
 
 | Method | Path | Auth | Notes |
 | --- | --- | --- | --- |
+| POST | `/auth/register` | – | `{ name, email, password }` → user + session cookie. 409 if the email exists |
+| POST | `/auth/login` | – | `{ email, password }` → user + session cookie. 401 with one generic message for wrong password or unknown email |
+| POST | `/auth/logout` | – | Clears the cookie |
+| GET | `/auth/me` | user | Current user |
 | GET | `/menu` | – | Available items (name, description, price in cents, image, category) |
-| POST | `/orders` | – | `{ customerName, address, phone, items: [{ menuItemId, quantity }] }`. Prices come from the DB, never the client. 400 invalid input, 422 unknown/unavailable item |
-| GET | `/orders/:id` | – | Order by id (unguessable UUID acts as the tracking link) |
-| GET | `/orders/:id/events` | – | **SSE**: `order` events with the full order, `ping` keep-alive; completes on `DELIVERED`/`CANCELLED` |
-| GET | `/orders?status=&limit=` | admin | Newest first |
+| POST | `/orders` | user | `{ customerName, address, phone, items: [{ menuItemId, quantity }] }`. Prices come from the DB, never the client. 400 invalid input, 422 unknown/unavailable item |
+| GET | `/orders/mine` | user | The caller's orders, newest first |
+| GET | `/orders/:id` | owner or admin | 404 for anyone else |
+| GET | `/orders/:id/events` | owner or admin | **SSE**: `order` events with the full order, `ping` keep-alive; completes on `DELIVERED`/`CANCELLED` |
+| GET | `/orders?status=&limit=` | admin | All orders, newest first |
 | PATCH | `/orders/:id/status` | admin | `{ status }`; 409 on an invalid transition |
 | DELETE | `/orders/:id` | admin | 204 |
 
-Admin auth = `x-admin-key` header (constant-time compare; no key configured means everything is denied).
 Status flow: `RECEIVED → PREPARING → OUT_FOR_DELIVERY → DELIVERED`; `CANCELLED` is allowed from `RECEIVED`/`PREPARING`.
 
 ## How real time works
 
 - A simulator walks each new order through the statuses every `ORDER_STEP_MS` (default 10 s). Steps are compare-and-set updates, so several server instances or an admin overriding a status never double-advance an order. Unfinished orders resume after a restart.
-- Every change is published on a Redis channel; each instance forwards it to SSE streams (customers) and the `/admin` socket.io namespace (admin dashboard).
+- Every change is published on a Redis channel; each instance forwards it to SSE streams (owners) and the `/admin` socket.io namespace (admins only; the handshake carries the session cookie).
 
 ## Commands
 
@@ -51,8 +62,8 @@ Status flow: `RECEIVED → PREPARING → OUT_FOR_DELIVERY → DELIVERED`; `CANCE
 
 ## Tests (Vitest everywhere)
 
-- Server: unit tests (order rules, service, simulator, guard, menu) and HTTP e2e tests (validation, CRUD, auth, status rules, SSE) run against in-memory Prisma/Redis fakes in `apps/server/test/fakes.ts`. No database needed.
-- Apps: Testing Library + jsdom (menu, cart store, checkout validation, order tracker + SSE hook, admin table, login).
+- Server: unit tests (order rules, service, simulator, auth, passwords, cookies, menu) and HTTP e2e tests (validation, CRUD, sessions, ownership and roles, status rules, SSE, admin websocket) run against in-memory Prisma/Redis fakes in `apps/server/test/fakes.ts`. No database needed.
+- Apps: Testing Library + jsdom (menu, cart store, login/register/checkout validation, redirect safety, order tracker + SSE hook, admin table, admin login).
 
 ## Notes
 
