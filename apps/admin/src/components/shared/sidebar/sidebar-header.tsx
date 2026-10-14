@@ -12,7 +12,13 @@ function getInitial(name: string) {
 	return name.trim().charAt(0).toUpperCase() || "?";
 }
 
-function BrandAvatar({ name, className }: { name: string; className?: string }) {
+function BrandAvatar({
+	name,
+	className,
+}: {
+	name: string;
+	className?: string;
+}) {
 	return (
 		<div
 			className={cn(

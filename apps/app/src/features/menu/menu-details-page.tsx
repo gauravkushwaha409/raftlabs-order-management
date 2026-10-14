@@ -1,13 +1,12 @@
-import { useQuery } from "@package/query";
 import { Badge, Button } from "@package/ui";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, CheckIcon, ShoppingBagIcon } from "lucide-react";
-import { getMenu } from "@/lib/api";
 import { formatPrice } from "@/lib/money";
 import { useCart } from "@/stores/cart.store";
+import { useMenuQuery } from "./hooks/queries/use-menu.query";
 
 export function MenuDetailsPage({ itemId }: { itemId: string }) {
-	const menu = useQuery(["menu"], getMenu);
+	const menu = useMenuQuery();
 	const inCart = useCart((state) =>
 		state.lines.some((line) => line.item.id === itemId),
 	);

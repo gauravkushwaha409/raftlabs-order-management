@@ -12,6 +12,7 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@package/api-client": "workspace:*",
 		"@package/form": "workspace:*",
 		"@package/query": "workspace:*",
 		"@package/ui": "workspace:*",

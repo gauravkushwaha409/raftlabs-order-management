@@ -1,74 +1,31 @@
-import { useMutation, useQuery } from "@package/query";
 import { Button } from "@package/ui";
-import { useQueryClient } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { useLogout } from "@/features/auth/session";
 import {
-	ApiError,
-	createMenuItem,
-	deleteMenuItem,
-	listMenuItems,
-	updateMenuItem,
-} from "@/lib/api";
-import type { MenuItem, MenuItemInput } from "@/types/api";
+	useDeleteMenuItemMutation,
+	useSaveMenuItemMutation,
+} from "@/features/food-items/hooks/mutations/use-menu-item.mutations";
+import { useMenuItemsQuery } from "@/features/food-items/hooks/queries/use-menu-items.query";
+import type { MenuItem } from "@/types/api";
 import { FoodItemDialog } from "./food-item-dialog";
 import { FoodItemsTable } from "./food-items-table";
 
-const MENU_ITEMS_QUERY_KEY = ["menu-items"];
-
 export function FoodItemsPage() {
 	const { mutate: signOut } = useLogout();
-	const queryClient = useQueryClient();
 	const [dialog, setDialog] = useState<{ item: MenuItem | null } | null>(null);
-	const [busyItemId, setBusyItemId] = useState<string | null>(null);
 
-	const signOutIfUnauthorized = (error: Error | null) => {
-		if (
-			error instanceof ApiError &&
-			(error.status === 401 || error.status === 403)
-		)
-			signOut();
-	};
+	const items = useMenuItemsQuery();
 
-	const items = useQuery(MENU_ITEMS_QUERY_KEY, listMenuItems, undefined, {
-		refetchOnMount: "always",
-	});
-
-	const save = useMutation(
-		({ item, input }: { item: MenuItem | null; input: MenuItemInput }) =>
-			item ? updateMenuItem(item.id, input) : createMenuItem(input),
-		{
-			onMutate: ({ item }) => setBusyItemId(item?.id ?? "new"),
-			onSuccess: (saved) => {
-				queryClient.setQueryData<MenuItem[]>(MENU_ITEMS_QUERY_KEY, (cached) => {
-					if (!cached) return [saved];
-					if (cached.some((entry) => entry.id === saved.id))
-						return cached.map((entry) => (entry.id === saved.id ? saved : entry));
-					return [...cached, saved];
-				});
-				setDialog(null);
-			},
-			onError: signOutIfUnauthorized,
-			onSettled: () => setBusyItemId(null),
-		},
-	);
-
-	const remove = useMutation(
-		(item: MenuItem) => deleteMenuItem(item.id).then(() => item),
-		{
-			onMutate: (item) => setBusyItemId(item.id),
-			onSuccess: (deleted) => {
-				queryClient.setQueryData<MenuItem[]>(MENU_ITEMS_QUERY_KEY, (cached) =>
-					cached?.filter((entry) => entry.id !== deleted.id),
-				);
-			},
-			onError: signOutIfUnauthorized,
-			onSettled: () => setBusyItemId(null),
-		},
-	);
+	const save = useSaveMenuItemMutation(signOut);
+	const remove = useDeleteMenuItemMutation(signOut);
 
 	const mutationError = save.error ?? remove.error;
+	const busyItemId = save.isPending
+		? (save.variables?.item?.id ?? "new")
+		: remove.isPending
+			? remove.variables?.id
+			: null;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -145,7 +102,12 @@ export function FoodItemsPage() {
 					onOpenChange={(open) => {
 						if (!open) setDialog(null);
 					}}
-					onSubmit={(input) => save.mutate({ item: dialog.item, input })}
+					onSubmit={(input) =>
+						save.mutate(
+							{ item: dialog.item, input },
+							{ onSuccess: () => setDialog(null) },
+						)
+					}
 				/>
 			)}
 		</div>

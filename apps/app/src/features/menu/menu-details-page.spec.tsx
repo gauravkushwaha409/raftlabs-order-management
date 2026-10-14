@@ -8,12 +8,14 @@ import {
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { getMenu } from "@/lib/api";
 import { useCart } from "@/stores/cart.store";
 import type { MenuItem } from "@/types/api";
 import { MenuDetailsPage } from "./menu-details-page";
+import { menuApiService } from "./services/menu-api.service";
 
-vi.mock("@/lib/api", () => ({ getMenu: vi.fn() }));
+vi.mock("./services/menu-api.service", () => ({
+	menuApiService: { listMenu: vi.fn() },
+}));
 
 const menu: MenuItem[] = [
 	{
@@ -40,14 +42,19 @@ async function renderWithRouter(ui: ReactNode) {
 	return render(<RouterProvider router={router} />);
 }
 
+const listEnvelope = (items: MenuItem[]) =>
+	({ data: { data: items } }) as unknown as Awaited<
+		ReturnType<typeof menuApiService.listMenu>
+	>;
+
 describe("MenuDetailsPage", () => {
 	beforeEach(() => {
 		useCart.setState({ lines: [] });
-		vi.mocked(getMenu).mockReset();
+		vi.mocked(menuApiService.listMenu).mockReset();
 	});
 
 	it("shows the food details and adds it to the cart", async () => {
-		vi.mocked(getMenu).mockResolvedValue(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValue(listEnvelope(menu));
 		await renderWithRouter(<MenuDetailsPage itemId="pizza" />);
 		const user = userEvent.setup();
 
@@ -65,7 +72,7 @@ describe("MenuDetailsPage", () => {
 	});
 
 	it("shows an in-cart state once the item is added", async () => {
-		vi.mocked(getMenu).mockResolvedValue(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValue(listEnvelope(menu));
 		await renderWithRouter(<MenuDetailsPage itemId="pizza" />);
 		const user = userEvent.setup();
 
@@ -80,19 +87,21 @@ describe("MenuDetailsPage", () => {
 	});
 
 	it("shows a not-available state for an unknown item", async () => {
-		vi.mocked(getMenu).mockResolvedValue(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValue(listEnvelope(menu));
 		await renderWithRouter(<MenuDetailsPage itemId="ghost" />);
 
 		expect(await screen.findByText("Dish not available.")).toBeInTheDocument();
 	});
 
 	it("shows an error with a retry", async () => {
-		vi.mocked(getMenu).mockRejectedValueOnce(new Error("Network down"));
+		vi
+			.mocked(menuApiService.listMenu)
+			.mockRejectedValueOnce(new Error("Network down"));
 		await renderWithRouter(<MenuDetailsPage itemId="pizza" />);
 		const user = userEvent.setup();
 
 		expect(await screen.findByRole("alert")).toHaveTextContent("Network down");
-		vi.mocked(getMenu).mockResolvedValueOnce(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValueOnce(listEnvelope(menu));
 		await user.click(screen.getByRole("button", { name: "Try again" }));
 
 		expect(

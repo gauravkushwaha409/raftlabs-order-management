@@ -1,18 +1,29 @@
-import { useMutation, useQuery } from "@package/query";
-import { type QueryClient, useQueryClient } from "@tanstack/react-query";
-import { redirect, useRouter } from "@tanstack/react-router";
-import { getMe, login, logout, register } from "@/lib/api";
-import type { User } from "@/types/api";
-import { safeRedirect } from "./redirect";
+/**
+ * Back-compat facades over the feature hooks (`hooks/queries|mutations`).
+ * New code should import the hooks directly; these aliases keep existing
+ * callers (routes, menus, pages) untouched.
+ */
+import type { QueryClient } from "@tanstack/react-query";
+import { redirect } from "@tanstack/react-router";
+import { QUERY_KEYS } from "@/config/query-keys";
+import {
+	useLoginMutation,
+	useLogoutMutation,
+	useRegisterMutation,
+} from "./hooks/mutations/use-auth.mutations";
+import { useMeQuery } from "./hooks/queries/use-me.query";
+import { authApiService } from "./services/auth-api.service";
 
-const ME_KEY = ["me"];
-const SESSION_STALE_MS = 60_000;
+export const useMe = useMeQuery;
+export const useLogin = useLoginMutation;
+export const useRegister = useRegisterMutation;
+export const useLogout = useLogoutMutation;
 
 export const fetchMe = (queryClient: QueryClient) =>
 	queryClient.fetchQuery({
-		queryKey: ME_KEY,
-		queryFn: getMe,
-		staleTime: SESSION_STALE_MS,
+		queryKey: [...QUERY_KEYS.AUTH.ME],
+		queryFn: () => authApiService.getMe(),
+		staleTime: 60_000,
 	});
 
 /** Route guard: visitors are sent to the login page and brought back afterwards. */
@@ -34,36 +45,4 @@ export async function redirectIfSignedIn({
 	context: { queryClient: QueryClient };
 }) {
 	if (await fetchMe(context.queryClient)) throw redirect({ to: "/" });
-}
-
-export const useMe = () =>
-	useQuery<User | null>(ME_KEY, getMe, undefined, {
-		staleTime: SESSION_STALE_MS,
-	});
-
-/** Stores the user in the session cache, then goes where the visitor was headed. */
-function useOnAuthenticated(redirectTo: string | undefined) {
-	const queryClient = useQueryClient();
-	const router = useRouter();
-	return (user: User) => {
-		queryClient.setQueryData(ME_KEY, user);
-		router.history.push(safeRedirect(redirectTo));
-	};
-}
-
-export const useLogin = (redirectTo: string | undefined) =>
-	useMutation(login, { onSuccess: useOnAuthenticated(redirectTo) });
-export const useRegister = (redirectTo: string | undefined) =>
-	useMutation(register, { onSuccess: useOnAuthenticated(redirectTo) });
-
-export function useLogout() {
-	const queryClient = useQueryClient();
-	const router = useRouter();
-	return useMutation(logout, {
-		onSuccess: () => {
-			queryClient.clear(); // drop every cached order and the session
-			queryClient.setQueryData(ME_KEY, null);
-			router.history.push("/");
-		},
-	});
 }

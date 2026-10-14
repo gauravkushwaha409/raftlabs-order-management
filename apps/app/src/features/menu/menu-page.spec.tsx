@@ -7,12 +7,14 @@ import {
 } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { getMenu } from "@/lib/api";
 import { useCart } from "@/stores/cart.store";
 import type { MenuItem } from "@/types/api";
 import { MenuPage } from "./menu-page";
+import { menuApiService } from "./services/menu-api.service";
 
-vi.mock("@/lib/api", () => ({ getMenu: vi.fn() }));
+vi.mock("./services/menu-api.service", () => ({
+	menuApiService: { listMenu: vi.fn() },
+}));
 
 const menu: MenuItem[] = [
 	{
@@ -57,14 +59,19 @@ const renderPage = async () => {
 	return render(<RouterProvider router={router} />);
 };
 
+const listEnvelope = (items: MenuItem[]) =>
+	({ data: { data: items } }) as unknown as Awaited<
+		ReturnType<typeof menuApiService.listMenu>
+	>;
+
 describe("MenuPage", () => {
 	beforeEach(() => {
 		useCart.setState({ lines: [] });
-		vi.mocked(getMenu).mockReset();
+		vi.mocked(menuApiService.listMenu).mockReset();
 	});
 
 	it("lists every item and filters by category", async () => {
-		vi.mocked(getMenu).mockResolvedValue(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValue(listEnvelope(menu));
 		await renderPage();
 		const user = userEvent.setup();
 
@@ -89,7 +96,7 @@ describe("MenuPage", () => {
 	});
 
 	it("adds items to the cart from the list", async () => {
-		vi.mocked(getMenu).mockResolvedValue(menu);
+		vi.mocked(menuApiService.listMenu).mockResolvedValue(listEnvelope(menu));
 		await renderPage();
 		const user = userEvent.setup();
 
@@ -116,9 +123,9 @@ describe("MenuPage", () => {
 
 	it("shows an error with a retry", async () => {
 		vi
-			.mocked(getMenu)
+			.mocked(menuApiService.listMenu)
 			.mockRejectedValueOnce(new Error("Network down"))
-			.mockResolvedValueOnce(menu);
+			.mockResolvedValueOnce(listEnvelope(menu));
 		await renderPage();
 		const user = userEvent.setup();
 

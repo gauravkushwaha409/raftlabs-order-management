@@ -1,14 +1,13 @@
+import type { ApiResponse } from "@package/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { login, logout } from "@/lib/api";
 import type { User } from "@/types/api";
+import { authApiService } from "./services/auth-api.service";
 import { useLogin } from "./session";
 
-vi.mock("@/lib/api", () => ({
-	login: vi.fn(),
-	logout: vi.fn(),
-	getMe: vi.fn(),
+vi.mock("./services/auth-api.service", () => ({
+	authApiService: { login: vi.fn(), logout: vi.fn(), getMe: vi.fn() },
 }));
 
 const user = (role: User["role"]): User => ({
@@ -17,6 +16,10 @@ const user = (role: User["role"]): User => ({
 	name: "A",
 	role,
 });
+
+/** Minimal envelope; the hook only reads `response.data.data`. */
+const loginResponse = (user: User) =>
+	({ data: { data: user } }) as unknown as ApiResponse<User>;
 
 const setup = () => {
 	const client = new QueryClient();
@@ -30,7 +33,9 @@ describe("useLogin", () => {
 	beforeEach(() => vi.clearAllMocks());
 
 	it("stores an admin in the session cache", async () => {
-		vi.mocked(login).mockResolvedValue(user("ADMIN"));
+		vi
+			.mocked(authApiService.login)
+			.mockResolvedValue(loginResponse(user("ADMIN")));
 		const { result, client } = setup();
 
 		await act(() =>
@@ -38,12 +43,16 @@ describe("useLogin", () => {
 		);
 
 		expect(client.getQueryData(["me"])).toEqual(user("ADMIN"));
-		expect(logout).not.toHaveBeenCalled();
+		expect(authApiService.logout).not.toHaveBeenCalled();
 	});
 
 	it("turns a customer away and signs them out again", async () => {
-		vi.mocked(login).mockResolvedValue(user("CUSTOMER"));
-		vi.mocked(logout).mockResolvedValue(undefined);
+		vi
+			.mocked(authApiService.login)
+			.mockResolvedValue(loginResponse(user("CUSTOMER")));
+		vi
+			.mocked(authApiService.logout)
+			.mockResolvedValue({ data: { data: null } } as unknown as ApiResponse<null>);
 		const { result, client } = setup();
 
 		act(() => result.current.mutate({ email: "a@example.com", password: "pw" }));
@@ -53,7 +62,7 @@ describe("useLogin", () => {
 				"This account does not have admin access",
 			),
 		);
-		expect(logout).toHaveBeenCalledTimes(1);
+		expect(authApiService.logout).toHaveBeenCalledTimes(1);
 		expect(client.getQueryData(["me"])).toBeUndefined();
 	});
 });

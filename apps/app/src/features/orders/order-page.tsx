@@ -1,6 +1,6 @@
+import { ApiError } from "@package/api-client";
 import { buttonVariants, cn } from "@package/ui";
 import { Link } from "@tanstack/react-router";
-import { ApiError } from "@/lib/api";
 import { OrderTracker } from "./order-tracker";
 import { useOrderStatus } from "./use-order-status";
 

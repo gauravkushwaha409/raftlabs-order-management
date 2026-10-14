@@ -1,9 +1,8 @@
-import { useQuery } from "@package/query";
 import { Badge, Button, buttonVariants, cn } from "@package/ui";
 import { Link } from "@tanstack/react-router";
-import { getMyOrders } from "@/lib/api";
 import { formatPrice } from "@/lib/money";
 import type { OrderStatus } from "@/types/api";
+import { useMyOrdersQuery } from "./hooks/queries/use-order.queries";
 import { PROGRESS_STEPS } from "./order-status";
 
 const BADGE = {
@@ -20,10 +19,7 @@ const labelFor = (status: OrderStatus) =>
 		: (PROGRESS_STEPS.find((step) => step.status === status)?.label ?? status);
 
 export function OrdersListPage() {
-	const orders = useQuery(["orders", "mine"], getMyOrders, undefined, {
-		refetchOnMount: "always",
-		staleTime: 0,
-	});
+	const orders = useMyOrdersQuery();
 
 	if (orders.isPending)
 		return (

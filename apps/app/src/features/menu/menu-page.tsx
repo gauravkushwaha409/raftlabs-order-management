@@ -1,14 +1,13 @@
-import { useQuery } from "@package/query";
 import { Button } from "@package/ui";
 import { useState } from "react";
-import { getMenu } from "@/lib/api";
 import { useCart } from "@/stores/cart.store";
+import { useMenuQuery } from "./hooks/queries/use-menu.query";
 import { MenuCard } from "./menu-card";
 
 const ALL = "All";
 
 export function MenuPage() {
-	const menu = useQuery(["menu"], getMenu);
+	const menu = useMenuQuery();
 	const [category, setCategory] = useState(ALL);
 	const lines = useCart((state) => state.lines);
 	const { add } = useCart.getState();

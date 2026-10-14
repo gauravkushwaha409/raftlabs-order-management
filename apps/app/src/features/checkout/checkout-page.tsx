@@ -1,22 +1,19 @@
-import { useMutation } from "@package/query";
 import { buttonVariants, cn } from "@package/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { createOrder } from "@/lib/api";
 import { formatPrice } from "@/lib/money";
 import { cartTotalCents, useCart } from "@/stores/cart.store";
 import { useMe } from "../auth/session";
 import { CartLines } from "../cart/cart-lines";
+import { useCreateOrderMutation } from "../orders/hooks/mutations/use-order.mutations";
 import { CheckoutForm } from "./checkout-form";
 
 export function CheckoutPage() {
 	const navigate = useNavigate();
 	const lines = useCart((state) => state.lines);
 	const me = useMe();
-	const place = useMutation(createOrder, {
-		onSuccess: (order) => {
-			useCart.getState().clear();
-			void navigate({ to: "/orders/$orderId", params: { orderId: order.id } });
-		},
+	const place = useCreateOrderMutation((order) => {
+		useCart.getState().clear();
+		void navigate({ to: "/orders/$orderId", params: { orderId: order.id } });
 	});
 
 	if (lines.length === 0 && !place.isSuccess) {

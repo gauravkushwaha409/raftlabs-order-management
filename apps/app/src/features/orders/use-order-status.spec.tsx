@@ -1,12 +1,20 @@
+import { toast } from "@package/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { getOrder } from "@/lib/api";
 import type { Order } from "@/types/api";
+import { ordersApiService } from "./services/orders-api.service";
 import { useOrderStatus } from "./use-order-status";
 
-vi.mock("@/lib/api", () => ({
-	getOrder: vi.fn(),
+vi.mock("@package/ui", () => ({
+	toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock("./services/orders-api.service", () => ({
+	ordersApiService: { getOrder: vi.fn() },
+}));
+
+vi.mock("@/lib/api-client", () => ({
 	orderEventsUrl: (id: string) => `/api/v1/orders/${id}/events`,
 }));
 
@@ -61,11 +69,21 @@ const createWrapper = () => {
 	);
 };
 
+const detailEnvelope = (item: Order) =>
+	({ data: { data: item } }) as unknown as Awaited<
+		ReturnType<typeof ordersApiService.getOrder>
+	>;
+
 describe("useOrderStatus", () => {
 	beforeEach(() => {
 		FakeEventSource.instances = [];
 		vi.stubGlobal("EventSource", FakeEventSource);
-		vi.mocked(getOrder).mockResolvedValue(order("RECEIVED"));
+		vi
+			.mocked(ordersApiService.getOrder)
+			.mockResolvedValue(detailEnvelope(order("RECEIVED")));
+		vi.mocked(toast.info).mockClear();
+		vi.mocked(toast.success).mockClear();
+		vi.mocked(toast.error).mockClear();
 	});
 	afterEach(() => vi.unstubAllGlobals());
 
@@ -111,5 +129,59 @@ describe("useOrderStatus", () => {
 		);
 		unmount();
 		expect(FakeEventSource.instances[0]?.closed).toBe(true);
+	});
+
+	it("toasts when the status moves, but not for repeat emissions", async () => {
+		const { result } = renderHook(
+			() => useOrderStatus("6b0c2d8e-0000-4000-8000-000000000000"),
+			{ wrapper: createWrapper() },
+		);
+		await waitFor(() => expect(result.current.order?.status).toBe("RECEIVED"));
+		const source = FakeEventSource.instances[0]!;
+
+		act(() => source.emit(order("PREPARING")));
+		await waitFor(() =>
+			expect(vi.mocked(toast.info)).toHaveBeenCalledWith("Preparing", {
+				description: "The kitchen is cooking",
+			}),
+		);
+
+		// Same status again: cache updates, no toast.
+		act(() => source.emit(order("PREPARING")));
+		expect(vi.mocked(toast.info)).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(toast.success)).not.toHaveBeenCalled();
+		expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+	});
+
+	it("toasts success on delivery and error on cancellation", async () => {
+		const { result } = renderHook(
+			() => useOrderStatus("6b0c2d8e-0000-4000-8000-000000000000"),
+			{ wrapper: createWrapper() },
+		);
+		await waitFor(() => expect(result.current.order?.status).toBe("RECEIVED"));
+		const source = FakeEventSource.instances[0]!;
+
+		act(() => source.emit(order("DELIVERED")));
+		await waitFor(() =>
+			expect(vi.mocked(toast.success)).toHaveBeenCalledWith("Delivered", {
+				description: "Enjoy your meal",
+			}),
+		);
+	});
+
+	it("toasts an error when the order is cancelled", async () => {
+		const { result } = renderHook(
+			() => useOrderStatus("6b0c2d8e-0000-4000-8000-000000000000"),
+			{ wrapper: createWrapper() },
+		);
+		await waitFor(() => expect(result.current.order?.status).toBe("RECEIVED"));
+		const source = FakeEventSource.instances[0]!;
+
+		act(() => source.emit(order("CANCELLED")));
+		await waitFor(() =>
+			expect(vi.mocked(toast.error)).toHaveBeenCalledWith("Order cancelled", {
+				description: "The restaurant had to cancel your order.",
+			}),
+		);
 	});
 });

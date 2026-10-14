@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { SERVER_ORIGIN } from "@/lib/api";
+import { QUERY_KEYS } from "@/config/query-keys";
+import { SERVER_ORIGIN } from "@/lib/api-client";
 import { applyOrderEvent } from "@/lib/order-cache";
 import type { Order, OrderEvent } from "@/types/api";
 
-export const ORDERS_QUERY_KEY = ["orders"];
+export const ORDERS_QUERY_KEY = [...QUERY_KEYS.ORDERS.ALL];
 
 /** Keeps the cached order list in sync with the API's admin websocket (namespace /admin, session cookie). */
 export function useLiveOrders(onUnauthorized: () => void) {
