@@ -147,7 +147,14 @@ export class OrdersService {
 
 	async remove(id: string): Promise<void> {
 		const order = await this.get(id);
-		await this.prisma.order.delete({ where: { id } });
+		try {
+			await this.prisma.order.delete({ where: { id } });
+		} catch (error) {
+			// A concurrent remover won the race; report 404, not a raw P2025.
+			if ((error as { code?: string }).code === "P2025")
+				throw new NotFoundException(`Order ${id} not found`);
+			throw error;
+		}
 		await this.events.publish({ type: "deleted", order });
 	}
 

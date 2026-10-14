@@ -82,4 +82,18 @@ describe("MenuService", () => {
 			service(prisma).remove("00000000-0000-4000-8000-000000000000"),
 		).rejects.toBeInstanceOf(NotFoundException);
 	});
+
+	it("takes a row-level lock before updating and removing", async () => {
+		const prisma = new FakePrisma();
+		const existing = prisma.addMenuItem({ name: "Locked", priceCents: 100 });
+
+		await service(prisma).update(existing.id, { priceCents: 200 });
+		await service(prisma).remove(existing.id);
+
+		expect(prisma.rawQueries).toHaveLength(2);
+		for (const query of prisma.rawQueries) {
+			expect(query).toMatch(/FOR UPDATE/);
+			expect(query).toContain(existing.id);
+		}
+	});
 });

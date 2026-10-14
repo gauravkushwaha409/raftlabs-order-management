@@ -252,6 +252,26 @@ describe("OrdersService", () => {
 				NotFoundException,
 			);
 		});
+
+		it("reports 404 when a concurrent remover deleted first", async () => {
+			const { service, prisma, pizza } = await setup();
+			const created = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 1 }],
+			});
+
+			// Simulate the interleaving: the row vanishes between get() and
+			// delete(), so Prisma raises P2025 instead of deleting.
+			const deleter = prisma.order.delete.bind(prisma.order);
+			prisma.order.delete = async (args: { where: { id: string } }) => {
+				await deleter(args);
+				return deleter(args);
+			};
+
+			await expect(service.remove(created.id)).rejects.toBeInstanceOf(
+				NotFoundException,
+			);
+		});
 	});
 
 	describe("watch", () => {

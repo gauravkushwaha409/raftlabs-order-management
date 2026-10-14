@@ -55,27 +55,37 @@ export class MenuService {
 	}
 
 	async update(id: string, input: UpdateMenuItem): Promise<AdminMenuItemView> {
-		const existing = await this.prisma.menuItem.findUnique({ where: { id } });
-		if (!existing) throw new NotFoundException(`Menu item ${id} not found`);
-		return this.prisma.menuItem.update({
-			where: { id },
-			data: input,
-			select: adminSelect,
+		// Pessimistic row-level lock: concurrent writers serialize here, so the
+		// read-check-write below never loses an update.
+		return this.prisma.$transaction(async (tx) => {
+			await tx.$queryRaw`SELECT "id" FROM "MenuItem" WHERE "id" = ${id} FOR UPDATE`;
+			const existing = await tx.menuItem.findUnique({ where: { id } });
+			if (!existing) throw new NotFoundException(`Menu item ${id} not found`);
+			return tx.menuItem.update({
+				where: { id },
+				data: input,
+				select: adminSelect,
+			});
 		});
 	}
 
 	async remove(id: string): Promise<void> {
-		const existing = await this.prisma.menuItem.findUnique({ where: { id } });
-		if (!existing) throw new NotFoundException(`Menu item ${id} not found`);
-		try {
-			await this.prisma.menuItem.delete({ where: { id } });
-		} catch (error) {
-			if ((error as { code?: string }).code === "P2003") {
-				throw new ConflictException(
-					"Menu item is referenced by existing orders and cannot be deleted; mark it unavailable instead",
-				);
+		// Same lock as update: a concurrent remover blocks, then sees the
+		// row is gone and gets a 404 instead of a raw P2025.
+		await this.prisma.$transaction(async (tx) => {
+			await tx.$queryRaw`SELECT "id" FROM "MenuItem" WHERE "id" = ${id} FOR UPDATE`;
+			const existing = await tx.menuItem.findUnique({ where: { id } });
+			if (!existing) throw new NotFoundException(`Menu item ${id} not found`);
+			try {
+				await tx.menuItem.delete({ where: { id } });
+			} catch (error) {
+				if ((error as { code?: string }).code === "P2003") {
+					throw new ConflictException(
+						"Menu item is referenced by existing orders and cannot be deleted; mark it unavailable instead",
+					);
+				}
+				throw error;
 			}
-			throw error;
-		}
+		});
 	}
 }

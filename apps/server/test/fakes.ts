@@ -53,6 +53,21 @@ export class FakePrisma {
 	menuItems: MenuItem[] = [];
 	orders: OrderRecord[] = [];
 	users: User[] = [];
+	/** Raw SQL issued through $queryRaw, in order (used to assert row locks). */
+	rawQueries: string[] = [];
+
+	async $queryRaw(query: TemplateStringsArray, ...values: unknown[]) {
+		let sql = query[0] ?? "";
+		values.forEach((value, index) => {
+			sql += String(value) + (query[index + 1] ?? "");
+		});
+		this.rawQueries.push(sql);
+		return [];
+	}
+
+	async $transaction<T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> {
+		return fn(this);
+	}
 
 	user = {
 		findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
@@ -188,7 +203,10 @@ export class FakePrisma {
 			return { count: targets.length };
 		},
 		delete: async ({ where }: { where: { id: string } }) => {
+			const before = this.orders.length;
 			this.orders = this.orders.filter((order) => order.id !== where.id);
+			if (this.orders.length === before)
+				throw Object.assign(new Error("not found"), { code: "P2025" });
 		},
 	};
 
