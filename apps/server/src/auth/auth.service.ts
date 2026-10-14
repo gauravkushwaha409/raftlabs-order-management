@@ -1,8 +1,6 @@
 import {
 	ConflictException,
 	Injectable,
-	Logger,
-	type OnApplicationBootstrap,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
@@ -22,30 +20,11 @@ const toAuthUser = ({ id, email, name, role }: AuthUser): AuthUser => ({
 const DUMMY_HASH = hashPassword("dummy-password-for-timing");
 
 @Injectable()
-export class AuthService implements OnApplicationBootstrap {
-	private readonly logger = new Logger(AuthService.name);
-
+export class AuthService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly jwt: JwtService,
 	) {}
-
-	/** Creates the first admin from ADMIN_EMAIL/ADMIN_PASSWORD. Existing accounts are never modified. */
-	async onApplicationBootstrap() {
-		const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-		const password = process.env.ADMIN_PASSWORD;
-		if (!email || !password) return;
-		if (await this.prisma.user.findUnique({ where: { email } })) return;
-		await this.prisma.user.create({
-			data: {
-				email,
-				name: "Admin",
-				passwordHash: await hashPassword(password),
-				role: "ADMIN",
-			},
-		});
-		this.logger.log(`Created admin account ${email}`);
-	}
 
 	async register(dto: RegisterDto): Promise<{ user: AuthUser; token: string }> {
 		if (await this.prisma.user.findUnique({ where: { email: dto.email } })) {

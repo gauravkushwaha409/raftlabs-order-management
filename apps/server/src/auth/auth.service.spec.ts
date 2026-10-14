@@ -21,11 +21,6 @@ function setup() {
 }
 
 describe("AuthService", () => {
-	afterEach(() => {
-		delete process.env.ADMIN_EMAIL;
-		delete process.env.ADMIN_PASSWORD;
-	});
-
 	describe("register", () => {
 		it("creates a customer with a hashed password and returns a token", async () => {
 			const { auth, prisma } = setup();
@@ -145,32 +140,6 @@ describe("AuthService", () => {
 			});
 			prisma.users = [];
 			expect(await auth.authenticate(token)).toBeNull();
-		});
-	});
-
-	describe("admin bootstrap", () => {
-		it("creates the admin from env once and never changes an existing account", async () => {
-			const { auth, prisma } = setup();
-			process.env.ADMIN_EMAIL = "Admin@Example.com";
-			process.env.ADMIN_PASSWORD = "admin-password-1";
-
-			await auth.onApplicationBootstrap();
-			const firstHash = prisma.users[0]?.passwordHash;
-			process.env.ADMIN_PASSWORD = "changed-password-2";
-			await auth.onApplicationBootstrap();
-
-			expect(prisma.users).toHaveLength(1);
-			expect(prisma.users[0]).toMatchObject({
-				email: "admin@example.com",
-				role: "ADMIN",
-			});
-			expect(prisma.users[0]?.passwordHash).toBe(firstHash);
-		});
-
-		it("does nothing without env settings", async () => {
-			const { auth, prisma } = setup();
-			await auth.onApplicationBootstrap();
-			expect(prisma.users).toHaveLength(0);
 		});
 	});
 });
