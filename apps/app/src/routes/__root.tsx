@@ -5,6 +5,7 @@ import {
 	Outlet,
 } from "@tanstack/react-router";
 import { UtensilsCrossedIcon } from "lucide-react";
+import { AuthMenu } from "@/features/auth/auth-menu";
 import { CartSheet } from "@/features/cart/cart-sheet";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
@@ -22,7 +23,10 @@ function RootLayout() {
 						<UtensilsCrossedIcon className="text-primary-500" />
 						Raftlabs Food
 					</Link>
-					<CartSheet />
+					<div className="flex items-center gap-3">
+						<AuthMenu />
+						<CartSheet />
+					</div>
 				</div>
 			</header>
 			<main className="mx-auto max-w-6xl px-4 py-8">

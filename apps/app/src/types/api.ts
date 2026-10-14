@@ -41,3 +41,10 @@ export interface CreateOrderInput {
 	phone: string;
 	items: Array<{ menuItemId: string; quantity: number }>;
 }
+
+export interface User {
+	id: string;
+	email: string;
+	name: string;
+	role: "CUSTOMER" | "ADMIN";
+}
