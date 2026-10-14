@@ -71,7 +71,7 @@ function RootLayout() {
 				</header>
 
 				<div className="flex-1 overflow-y-auto rounded-l-[12px] border border-gray-border-50 bg-white-base shadow-sm">
-					<div className="mx-auto max-w-6xl px-4 py-8">
+					<div className="px-6 py-8">
 						<Outlet />
 					</div>
 				</div>
