@@ -1,8 +1,9 @@
-import { Button } from "@package/ui";
+import { Input } from "@package/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
-import { ShieldCheckIcon } from "lucide-react";
-import { useAdmin, useLogout } from "@/features/auth/session";
+import { Bell, Search } from "lucide-react";
+import { Sidebar } from "@/components/shared/sidebar";
+import { useAdmin } from "@/features/auth/session";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 	{
@@ -10,33 +11,71 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 	},
 );
 
+/**
+ * Mirrors chat-app `routes/_organization-protected/$organization.tsx`:
+ * sidebar on the left, header (search + notifications) up top, and the
+ * route outlet inside a rounded content card.
+ * Logged-out users (login form) get a plain centered layout with no sidebar.
+ */
 function RootLayout() {
 	const admin = useAdmin();
-	const logout = useLogout();
+
+	if (admin.isPending) {
+		return (
+			<div className="flex min-h-screen items-center justify-center bg-gray-50">
+				<div
+					role="status"
+					aria-label="Loading"
+					className="h-48 w-full max-w-md animate-pulse rounded-xl bg-gray-100"
+				/>
+			</div>
+		);
+	}
+
+	if (!admin.data) {
+		return (
+			<div className="flex min-h-screen items-center justify-center bg-background-base px-4">
+				<Outlet />
+			</div>
+		);
+	}
 
 	return (
-		<div className="min-h-screen bg-background-base">
-			<header className="border-b border-gray-border-200 bg-white-base">
-				<div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-					<h1 className="typo-h5 flex items-center gap-2 text-gray-800">
-						<ShieldCheckIcon className="text-primary-500" />
-						Raftlabs Admin
-					</h1>
-					{admin.data && (
-						<Button
-							variant="secondary"
-							size="sm"
-							className="w-auto"
-							onClick={() => logout.mutate()}
-						>
-							Sign out
-						</Button>
-					)}
+		<section className="flex h-screen overflow-hidden bg-gray-50">
+			<Sidebar />
+
+			<section className="flex min-w-0 flex-1 flex-col py-2.5">
+				<header className="flex items-center justify-between px-5 pb-2.5">
+					<Input
+						leftIcon={<Search size={18} className="text-gray-400" />}
+						className="w-100 border-gray-200 bg-white-base"
+						placeholder="Quick Search"
+						rightIcon={
+							<div className="flex gap-1.5 text-primary-400">
+								<kbd className="rounded-xs bg-primary-50 p-px text-[11px] leading-none">
+									⌘
+								</kbd>
+								<kbd className="rounded-xs bg-primary-50 p-px text-[11px] leading-none">
+									K
+								</kbd>
+							</div>
+						}
+					/>
+					<button
+						type="button"
+						aria-label="Notifications"
+						className="flex size-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-fill-50 hover:text-gray-700"
+					>
+						<Bell size={20} />
+					</button>
+				</header>
+
+				<div className="flex-1 overflow-y-auto rounded-l-[12px] border border-gray-border-50 bg-white-base shadow-sm">
+					<div className="mx-auto max-w-6xl px-4 py-8">
+						<Outlet />
+					</div>
 				</div>
-			</header>
-			<main className="mx-auto max-w-6xl px-4 py-8">
-				<Outlet />
-			</main>
-		</div>
+			</section>
+		</section>
 	);
 }
