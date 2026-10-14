@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Home } from "@/pages/home";
+import { AdminGate } from "@/features/auth/admin-gate";
+import { OrdersPage } from "@/features/orders/orders-page";
 
 export const Route = createFileRoute("/")({
-	component: Home,
+	component: () => (
+		<AdminGate>{(adminKey) => <OrdersPage adminKey={adminKey} />}</AdminGate>
+	),
 });
