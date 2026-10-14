@@ -80,3 +80,36 @@ export const MENU_SEED = [
 		image: photo("1621263764928-df1444c5e859"),
 	},
 ] as const;
+
+/** Dev/staging demo accounts. Production never uses these: it only seeds credentials passed via env. */
+export const DEMO_ACCOUNTS = {
+	admin: { email: "admin@example.com", password: "Admin@12345", name: "Admin" },
+	customer: {
+		email: "customer@example.com",
+		password: "Customer@12345",
+		name: "Demo Customer",
+	},
+} as const;
+
+/** Past orders for the demo customer (development only), so the dashboards are not empty. */
+export const DEMO_ORDERS = [
+	{
+		status: "DELIVERED",
+		hoursAgo: 26,
+		customerName: "Demo Customer",
+		address: "12 Analytical Way, London",
+		phone: "+44 20 7946 0000",
+		lines: [
+			{ menuItem: "Margherita Pizza", quantity: 2 },
+			{ menuItem: "Fresh Lemonade", quantity: 1 },
+		],
+	},
+	{
+		status: "CANCELLED",
+		hoursAgo: 3,
+		customerName: "Demo Customer",
+		address: "12 Analytical Way, London",
+		phone: "+44 20 7946 0000",
+		lines: [{ menuItem: "Classic Cheeseburger", quantity: 1 }],
+	},
+] as const;

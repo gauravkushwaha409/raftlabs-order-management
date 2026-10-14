@@ -4,12 +4,12 @@ import { io } from "socket.io-client";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { configureApp } from "../src/app.setup.js";
+import { hashPassword } from "../src/auth/password.js";
 import { PrismaService } from "../src/prisma/prisma.service.js";
 import { RedisService } from "../src/redis/redis.service.js";
 import { FakePrisma, FakeRedis } from "./fakes.js";
 
 const ADMIN = { email: "admin@example.com", password: "admin-password-1" };
-const DEMO = { email: "customer@example.com", password: "Customer@12345" };
 const customer = {
 	customerName: "Ada Lovelace",
 	address: "12 Analytical Way",
@@ -27,12 +27,14 @@ describe("API (e2e)", () => {
 
 	beforeAll(async () => {
 		process.env.JWT_SECRET = "e2e-secret-e2e-secret-e2e-secret-1234";
-		process.env.ADMIN_EMAIL = ADMIN.email;
-		process.env.ADMIN_PASSWORD = ADMIN.password;
-		process.env.CUSTOMER_EMAIL = DEMO.email;
-		process.env.CUSTOMER_PASSWORD = DEMO.password;
 		process.env.ORDER_STEP_MS = "3600000"; // keep the simulator out of the way
 		prisma = new FakePrisma();
+		prisma.addUser({
+			email: ADMIN.email,
+			name: "Admin",
+			role: "ADMIN",
+			passwordHash: await hashPassword(ADMIN.password),
+		});
 		pizzaId = prisma.addMenuItem({ name: "Pizza", priceCents: 1000 }).id;
 		prisma.addMenuItem({ name: "Burger", priceCents: 900, category: "Burgers" });
 
@@ -52,15 +54,7 @@ describe("API (e2e)", () => {
 
 	afterAll(async () => {
 		await app.close();
-		for (const key of [
-			"JWT_SECRET",
-			"ADMIN_EMAIL",
-			"ADMIN_PASSWORD",
-			"CUSTOMER_EMAIL",
-			"CUSTOMER_PASSWORD",
-			"ORDER_STEP_MS",
-		])
-			delete process.env[key];
+		for (const key of ["JWT_SECRET", "ORDER_STEP_MS"]) delete process.env[key];
 	});
 
 	const cookieFrom = (response: request.Response) =>
@@ -206,16 +200,7 @@ describe("API (e2e)", () => {
 			);
 		});
 
-		it("the seeded demo customer can sign in and order without registering", async () => {
-			const response = await http
-				.post("/api/v1/auth/login")
-				.send(DEMO)
-				.expect(200);
-			expect(response.body.role).toBe("CUSTOMER");
-			await placeOrder(cookieFrom(response)).expect(201);
-		});
-
-		it("the seeded admin can sign in with the ADMIN role", async () => {
+		it("an admin account can sign in with the ADMIN role", async () => {
 			const response = await http
 				.post("/api/v1/auth/login")
 				.send(ADMIN)

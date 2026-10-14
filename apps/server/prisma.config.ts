@@ -13,6 +13,9 @@ dotenv.config({
 
 export default defineConfig({
 	schema: "prisma/schema.prisma",
-	migrations: { path: "prisma/migrations" },
+	migrations: {
+		path: "prisma/migrations",
+		seed: "tsc -p tsconfig.seed.json && node dist-seed/prisma/seed.js",
+	},
 	datasource: { url: process.env.DATABASE_URL },
 });

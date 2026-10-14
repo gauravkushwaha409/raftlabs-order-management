@@ -8,7 +8,6 @@ import { MenuModule } from "./menu/menu.module.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { RedisModule } from "./redis/redis.module.js";
-import { SeedModule } from "./seed/seed.module.js";
 
 @Module({
 	imports: [
@@ -22,7 +21,6 @@ import { SeedModule } from "./seed/seed.module.js";
 		AuthModule,
 		MenuModule,
 		OrdersModule,
-		SeedModule,
 	],
 	controllers: [HealthController],
 	providers: [
