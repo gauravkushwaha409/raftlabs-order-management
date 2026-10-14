@@ -1,5 +1,12 @@
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import type { MenuItem } from "@/types/api";
 import { MenuCard } from "./menu-card";
 
@@ -12,16 +19,19 @@ const item: MenuItem = {
 	category: "Pizza",
 };
 
+async function renderWithRouter(ui: ReactNode) {
+	const rootRoute = createRootRoute({ component: () => <>{ui}</> });
+	const router = createRouter({
+		routeTree: rootRoute,
+		history: createMemoryHistory({ initialEntries: ["/"] }),
+	});
+	await router.load();
+	return render(<RouterProvider router={router} />);
+}
+
 describe("MenuCard", () => {
-	it("shows name, description, price and image", () => {
-		render(
-			<MenuCard
-				item={item}
-				quantity={0}
-				onAdd={vi.fn()}
-				onQuantityChange={vi.fn()}
-			/>,
-		);
+	it("shows name, description, price and image", async () => {
+		await renderWithRouter(<MenuCard item={item} onAdd={vi.fn()} />);
 
 		expect(
 			screen.getByRole("heading", { name: "Margherita Pizza" }),
@@ -36,14 +46,7 @@ describe("MenuCard", () => {
 
 	it("adds the item to the cart", async () => {
 		const onAdd = vi.fn();
-		render(
-			<MenuCard
-				item={item}
-				quantity={0}
-				onAdd={onAdd}
-				onQuantityChange={vi.fn()}
-			/>,
-		);
+		await renderWithRouter(<MenuCard item={item} onAdd={onAdd} />);
 
 		await userEvent.click(
 			screen.getByRole("button", { name: "Add Margherita Pizza to cart" }),
@@ -52,50 +55,22 @@ describe("MenuCard", () => {
 		expect(onAdd).toHaveBeenCalledWith(item);
 	});
 
-	it("shows a quantity stepper once the item is in the cart", async () => {
-		const onQuantityChange = vi.fn();
-		render(
-			<MenuCard
-				item={item}
-				quantity={2}
-				onAdd={vi.fn()}
-				onQuantityChange={onQuantityChange}
-			/>,
-		);
+	it("never shows a quantity stepper on the list", async () => {
+		await renderWithRouter(<MenuCard item={item} onAdd={vi.fn()} />);
 
 		expect(
-			screen.queryByRole("button", { name: /add .* to cart/i }),
+			screen.queryByRole("button", { name: /quantity of/i }),
 		).not.toBeInTheDocument();
-		expect(screen.getByText("2")).toBeInTheDocument();
-
-		await userEvent.click(
-			screen.getByRole("button", {
-				name: "Increase quantity of Margherita Pizza",
-			}),
-		);
-		await userEvent.click(
-			screen.getByRole("button", {
-				name: "Decrease quantity of Margherita Pizza",
-			}),
-		);
-
-		expect(onQuantityChange).toHaveBeenNthCalledWith(1, item, 3);
-		expect(onQuantityChange).toHaveBeenNthCalledWith(2, item, 1);
+		expect(
+			screen.getByRole("button", { name: "Add Margherita Pizza to cart" }),
+		).toBeInTheDocument();
 	});
 
-	it("stops increasing at the maximum quantity", () => {
-		render(
-			<MenuCard
-				item={item}
-				quantity={20}
-				onAdd={vi.fn()}
-				onQuantityChange={vi.fn()}
-			/>,
-		);
+	it("links to the food details page", async () => {
+		await renderWithRouter(<MenuCard item={item} onAdd={vi.fn()} />);
+
 		expect(
-			screen.getByRole("button", {
-				name: "Increase quantity of Margherita Pizza",
-			}),
-		).toBeDisabled();
+			screen.getByRole("link", { name: "View Margherita Pizza" }),
+		).toHaveAttribute("href", "/menu/pizza");
 	});
 });

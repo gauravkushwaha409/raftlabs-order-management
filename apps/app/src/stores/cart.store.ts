@@ -24,14 +24,10 @@ export const useCart = create<CartState>()(
 			add: (item) =>
 				set(({ lines }) => {
 					const existing = lines.find((line) => line.item.id === item.id);
-					if (!existing) return { lines: [...lines, { item, quantity: 1 }] };
-					return {
-						lines: lines.map((line) =>
-							line.item.id === item.id
-								? { ...line, quantity: Math.min(line.quantity + 1, MAX_QUANTITY) }
-								: line,
-						),
-					};
+					// Add is idempotent: it only puts the item in the cart.
+					// Quantity changes happen from the cart, never from repeated taps.
+					if (existing) return { lines };
+					return { lines: [...lines, { item, quantity: 1 }] };
 				}),
 			setQuantity: (itemId, quantity) =>
 				set(({ lines }) => ({

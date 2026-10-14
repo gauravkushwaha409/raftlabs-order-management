@@ -1,4 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { getMenu } from "@/lib/api";
@@ -35,12 +41,21 @@ const menu: MenuItem[] = [
 	},
 ];
 
-const renderPage = () =>
-	render(
-		<QueryClientProvider client={new QueryClient()}>
-			<MenuPage />
-		</QueryClientProvider>,
-	);
+const renderPage = async () => {
+	const rootRoute = createRootRoute({
+		component: () => (
+			<QueryClientProvider client={new QueryClient()}>
+				<MenuPage />
+			</QueryClientProvider>
+		),
+	});
+	const router = createRouter({
+		routeTree: rootRoute,
+		history: createMemoryHistory({ initialEntries: ["/"] }),
+	});
+	await router.load();
+	return render(<RouterProvider router={router} />);
+};
 
 describe("MenuPage", () => {
 	beforeEach(() => {
@@ -50,7 +65,7 @@ describe("MenuPage", () => {
 
 	it("lists every item and filters by category", async () => {
 		vi.mocked(getMenu).mockResolvedValue(menu);
-		renderPage();
+		await renderPage();
 		const user = userEvent.setup();
 
 		expect(await screen.findAllByRole("article")).toHaveLength(3);
@@ -73,9 +88,9 @@ describe("MenuPage", () => {
 		);
 	});
 
-	it("adds items to the cart and lets the quantity change", async () => {
+	it("adds items to the cart from the list", async () => {
 		vi.mocked(getMenu).mockResolvedValue(menu);
-		renderPage();
+		await renderPage();
 		const user = userEvent.setup();
 
 		await user.click(
@@ -83,21 +98,14 @@ describe("MenuPage", () => {
 		);
 		expect(useCart.getState().lines).toEqual([{ item: menu[1], quantity: 1 }]);
 
+		// Tapping add again does not bump the quantity; that happens in the cart.
 		await user.click(
-			screen.getByRole("button", { name: "Increase quantity of Margherita" }),
-		);
-		expect(useCart.getState().lines[0]?.quantity).toBe(2);
-
-		await user.click(
-			screen.getByRole("button", { name: "Decrease quantity of Margherita" }),
-		);
-		await user.click(
-			screen.getByRole("button", { name: "Decrease quantity of Margherita" }),
-		);
-		expect(useCart.getState().lines).toEqual([]);
-		expect(
 			screen.getByRole("button", { name: "Add Margherita to cart" }),
-		).toBeInTheDocument();
+		);
+		expect(useCart.getState().lines[0]?.quantity).toBe(1);
+		expect(
+			screen.queryByRole("button", { name: /quantity of/i }),
+		).not.toBeInTheDocument();
 	});
 
 	it("shows an error with a retry", async () => {
@@ -105,7 +113,7 @@ describe("MenuPage", () => {
 			.mocked(getMenu)
 			.mockRejectedValueOnce(new Error("Network down"))
 			.mockResolvedValueOnce(menu);
-		renderPage();
+		await renderPage();
 		const user = userEvent.setup();
 
 		expect(await screen.findByRole("alert")).toHaveTextContent("Network down");

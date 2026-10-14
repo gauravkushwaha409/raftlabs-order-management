@@ -98,6 +98,7 @@ export function FoodItemDialog({
 					</Button>
 					<Button
 						type="button"
+						className="w-auto"
 						disabled={isPending}
 						isPending={isPending}
 						pendingText="Saving…"

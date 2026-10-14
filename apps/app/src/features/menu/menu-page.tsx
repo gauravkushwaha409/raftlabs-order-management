@@ -10,8 +10,7 @@ const ALL = "All";
 export function MenuPage() {
 	const menu = useQuery(["menu"], getMenu);
 	const [category, setCategory] = useState(ALL);
-	const lines = useCart((state) => state.lines);
-	const { add, setQuantity } = useCart.getState();
+	const { add } = useCart.getState();
 
 	if (menu.isPending) {
 		return (
@@ -71,15 +70,7 @@ export function MenuPage() {
 			</fieldset>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{visible.map((item) => (
-					<MenuCard
-						key={item.id}
-						item={item}
-						quantity={lines.find((line) => line.item.id === item.id)?.quantity ?? 0}
-						onAdd={add}
-						onQuantityChange={(menuItem, quantity) =>
-							setQuantity(menuItem.id, quantity)
-						}
-					/>
+					<MenuCard key={item.id} item={item} onAdd={add} />
 				))}
 			</div>
 		</div>

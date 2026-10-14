@@ -24,13 +24,13 @@ describe("cart store", () => {
 		localStorage.clear();
 	});
 
-	it("adds new items with quantity 1 and increments existing ones", () => {
+	it("adds new items with quantity 1 and ignores repeats", () => {
 		const { add } = useCart.getState();
 		add(pizza);
 		add(pizza);
 		add(soda);
 		expect(useCart.getState().lines).toEqual([
-			{ item: pizza, quantity: 2 },
+			{ item: pizza, quantity: 1 },
 			{ item: soda, quantity: 1 },
 		]);
 	});
