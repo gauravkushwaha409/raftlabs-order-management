@@ -6,16 +6,19 @@ interface CheckoutFormProps {
 	onSubmit: (values: CheckoutValues) => void;
 	isPending?: boolean;
 	error?: string | null;
+	/** Pre-fills the name field, e.g. with the signed-in user's name. */
+	defaultName?: string;
 }
 
 export function CheckoutForm({
 	onSubmit,
 	isPending = false,
 	error,
+	defaultName = "",
 }: CheckoutFormProps) {
 	const form = useForm<CheckoutValues>({
 		schema: checkoutSchema,
-		defaultValues: { customerName: "", address: "", phone: "" },
+		defaultValues: { customerName: defaultName, address: "", phone: "" },
 	});
 
 	return (

@@ -18,9 +18,11 @@ class FakeEventSource {
 	private listeners = new Map<string, (event: MessageEvent<string>) => void>();
 
 	readonly url: string;
+	readonly options?: EventSourceInit;
 
-	constructor(url: string) {
+	constructor(url: string, options?: EventSourceInit) {
 		this.url = url;
+		this.options = options;
 		FakeEventSource.instances.push(this);
 	}
 	addEventListener(
@@ -78,6 +80,7 @@ describe("useOrderStatus", () => {
 		expect(source.url).toBe(
 			"/api/v1/orders/6b0c2d8e-0000-4000-8000-000000000000/events",
 		);
+		expect(source.options).toEqual({ withCredentials: true }); // the session cookie must reach the stream
 		act(() => source.onopen?.());
 		expect(result.current.live).toBe(true);
 

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/features/auth/session";
 import { OrderPage } from "@/features/orders/order-page";
 
 export const Route = createFileRoute("/orders/$orderId")({
+	beforeLoad: requireAuth,
 	component: OrderRoute,
 });
 

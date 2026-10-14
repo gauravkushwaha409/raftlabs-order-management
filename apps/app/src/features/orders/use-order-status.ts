@@ -19,7 +19,9 @@ export function useOrderStatus(orderId: string) {
 	const [live, setLive] = useState(false);
 
 	useEffect(() => {
-		const source = new EventSource(orderEventsUrl(orderId));
+		const source = new EventSource(orderEventsUrl(orderId), {
+			withCredentials: true,
+		});
 		source.onopen = () => setLive(true);
 		source.onerror = () => setLive(false); // EventSource reconnects on its own
 		source.addEventListener("order", (event) => {

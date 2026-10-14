@@ -1,4 +1,4 @@
-import { Button } from "@package/ui";
+import { buttonVariants, cn } from "@package/ui";
 import { Link } from "@tanstack/react-router";
 import { ApiError } from "@/lib/api";
 import { OrderTracker } from "./order-tracker";
@@ -17,6 +17,27 @@ export function OrderPage({ orderId }: { orderId: string }) {
 		);
 	}
 
+	if (error instanceof ApiError && error.status === 401) {
+		return (
+			<div
+				role="alert"
+				className="flex flex-col items-center gap-3 py-16 text-center"
+			>
+				<p className="typo-t1 text-gray-800">Your session has expired.</p>
+				<Link
+					to="/login"
+					search={{ redirect: `/orders/${orderId}` }}
+					className={cn(
+						buttonVariants({ variant: "default", size: "default" }),
+						"w-auto",
+					)}
+				>
+					Sign in
+				</Link>
+			</div>
+		);
+	}
+
 	if (error || !order) {
 		const notFound = error instanceof ApiError && error.status === 404;
 		return (
@@ -29,10 +50,14 @@ export function OrderPage({ orderId }: { orderId: string }) {
 						? "We couldn't find that order."
 						: "We couldn't load your order."}
 				</p>
-				<Link to="/">
-					<Button className="w-auto" variant="secondary">
-						Back to the menu
-					</Button>
+				<Link
+					to="/"
+					className={cn(
+						buttonVariants({ variant: "secondary", size: "default" }),
+						"w-auto",
+					)}
+				>
+					Back to the menu
 				</Link>
 			</div>
 		);
@@ -55,10 +80,14 @@ export function OrderPage({ orderId }: { orderId: string }) {
 				)}
 			</header>
 			<OrderTracker order={order} />
-			<Link to="/" className="self-start">
-				<Button className="w-auto" variant="secondary">
-					Order something else
-				</Button>
+			<Link
+				to="/"
+				className={cn(
+					buttonVariants({ variant: "secondary", size: "default" }),
+					"w-auto self-start",
+				)}
+			>
+				Order something else
 			</Link>
 		</div>
 	);

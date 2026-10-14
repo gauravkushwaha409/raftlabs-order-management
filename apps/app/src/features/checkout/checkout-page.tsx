@@ -1,15 +1,17 @@
 import { useMutation } from "@package/query";
-import { Button } from "@package/ui";
+import { buttonVariants, cn } from "@package/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createOrder } from "@/lib/api";
 import { formatPrice } from "@/lib/money";
 import { cartTotalCents, useCart } from "@/stores/cart.store";
+import { useMe } from "../auth/session";
 import { CartLines } from "../cart/cart-lines";
 import { CheckoutForm } from "./checkout-form";
 
 export function CheckoutPage() {
 	const navigate = useNavigate();
 	const lines = useCart((state) => state.lines);
+	const me = useMe();
 	const place = useMutation(createOrder, {
 		onSuccess: (order) => {
 			useCart.getState().clear();
@@ -21,10 +23,14 @@ export function CheckoutPage() {
 		return (
 			<div className="flex flex-col items-center gap-4 py-16 text-center">
 				<p className="typo-t1 text-gray-800">Your cart is empty.</p>
-				<Link to="/">
-					<Button className="w-auto" variant="secondary">
-						Browse the menu
-					</Button>
+				<Link
+					to="/"
+					className={cn(
+						buttonVariants({ variant: "secondary", size: "default" }),
+						"w-auto",
+					)}
+				>
+					Browse the menu
 				</Link>
 			</div>
 		);
@@ -40,6 +46,7 @@ export function CheckoutPage() {
 					Delivery details
 				</h2>
 				<CheckoutForm
+					defaultName={me.data?.name}
 					isPending={place.isPending}
 					error={place.error?.message ?? null}
 					onSubmit={(values) =>
