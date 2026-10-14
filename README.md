@@ -22,7 +22,16 @@ pnpm prisma:deploy && pnpm dev             # run apps on the host
 ```
 
 Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`.
-The menu is seeded on first start when the table is empty. The first admin account is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in the env file (dev default `admin@example.com` / `change-me-admin-password`; change both and `JWT_SECRET` outside dev).
+## Seed data
+
+On startup the server fills missing demo data (reruns never change existing rows): the 10-item menu plus two accounts, so you can sign in without registering.
+
+| Role | Email | Password | Where |
+| --- | --- | --- | --- |
+| Customer | `customer@example.com` | `Customer@12345` | app (`:3000`) |
+| Admin | `admin@example.com` | `Admin@12345` | admin (`:3001`) |
+
+Override them with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / `CUSTOMER_PASSWORD`. Outside production the values above are the fallback when unset. In production nothing falls back to a default password: an account is only created when both its variables are set. Also change `JWT_SECRET` outside dev.
 
 ## Auth
 
