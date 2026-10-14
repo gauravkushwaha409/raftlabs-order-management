@@ -1,0 +1,52 @@
+# apps/admin/docker/Dockerfile.production
+#
+# Release image for admin: Vite build served by `vite preview`. Build context is
+# the repo root:
+#
+#   docker build -f apps/admin/docker/Dockerfile.production --build-arg APP_ENV=production .
+#
+# Notes:
+# - Vite bakes VITE_* values into the bundle at BUILD time, so rebuild after
+#   changing public URLs. env/.env.<APP_ENV> is read at build time only.
+# - ADMIN_PORT must be provided at runtime (compose passes it from env file).
+
+ARG APP_ENV=production
+
+# ── base ──────────────────────────────────────────────────────────
+FROM node:24-alpine AS base
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/app/package.json ./apps/app/
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/ui/package.json ./packages/ui/
+
+RUN pnpm install --frozen-lockfile
+
+# ── builder ───────────────────────────────────────────────────────
+FROM base AS builder
+ARG APP_ENV
+
+COPY packages ./packages
+COPY apps/admin ./apps/admin
+
+# build-time env: vite reads envDir ../../env (.env.<mode>)
+COPY env/.env.${APP_ENV} ./env/
+
+RUN pnpm --filter admin exec vite build --mode ${APP_ENV}
+
+# ── runtime ───────────────────────────────────────────────────────
+# Full install kept from base: `vite preview` needs vite + the plugins that
+# vite.config.ts imports (devDependencies).
+FROM base AS runtime
+
+COPY packages ./packages
+# vite.config.ts loads the router plugin, which scans src/routes even for preview
+COPY apps/admin ./apps/admin
+COPY --from=builder /app/apps/admin/dist ./apps/admin/dist
+
+EXPOSE 3001
+
+CMD ["sh", "-c", "pnpm --filter admin exec vite preview --host 0.0.0.0 --port ${ADMIN_PORT:?ADMIN_PORT must be provided}"]

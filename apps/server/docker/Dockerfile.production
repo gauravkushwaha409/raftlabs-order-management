@@ -1,0 +1,59 @@
+# apps/server/docker/Dockerfile.production
+#
+# Release image for server. Build context is the repo root:
+#
+#   docker build -f apps/server/docker/Dockerfile.production .
+#
+# Notes:
+# - pnpm comes from corepack and resolves to the root package.json
+#   `packageManager` field.
+# - .dockerignore excludes **/dist and **/src/generated, so the build and
+#   `prisma generate` always run fresh inside the image.
+# - Runtime env (DATABASE_URL, REDIS_HOST, SERVER_PORT, ...) is injected by
+#   compose/env_file. Nothing from env/ is baked into the image.
+
+# ── base ──────────────────────────────────────────────────────────
+FROM node:24-alpine AS base
+RUN corepack enable
+WORKDIR /app
+
+# ── builder ───────────────────────────────────────────────────────
+FROM base AS builder
+
+# manifests only -> install layer stays cached until deps change
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/app/package.json ./apps/app/
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/ui/package.json ./packages/ui/
+
+RUN pnpm install --frozen-lockfile
+
+COPY apps/server ./apps/server
+
+RUN pnpm --filter server prisma:generate \
+ && pnpm --filter server build
+
+# ── runtime ───────────────────────────────────────────────────────
+FROM base AS runtime
+ENV NODE_ENV=production
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/app/package.json ./apps/app/
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/ui/package.json ./packages/ui/
+
+# Full install (not --prod): the `prisma` CLI is a devDependency and is
+# needed at container start for `prisma migrate deploy`.
+RUN pnpm install --frozen-lockfile --filter server...
+
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/apps/server/src/generated ./apps/server/src/generated
+# schema + migrations + datasource config for `prisma migrate deploy`
+COPY apps/server/prisma ./apps/server/prisma
+COPY apps/server/prisma.config.ts ./apps/server/
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "pnpm --filter server prisma:deploy && node apps/server/dist/main.js"]

@@ -1,0 +1,21 @@
+# apps/server/docker/Dockerfile.development
+#
+# Development image for server. Build context is the repo root; source comes
+# from bind mounts in docker/docker-compose.development.yml.
+
+FROM node:24-alpine
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/server/package.json ./apps/server/
+COPY apps/app/package.json ./apps/app/
+COPY apps/admin/package.json ./apps/admin/
+COPY packages/ui/package.json ./packages/ui/
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+# Port comes from SERVER_PORT (main.ts reads it, compose maps it)
+EXPOSE 8000

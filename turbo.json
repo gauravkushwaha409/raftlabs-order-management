@@ -1,0 +1,51 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"ui": "tui",
+	"globalEnv": [
+		"APP_ENV",
+		"DATABASE_URL",
+		"SERVER_PORT",
+		"APP_PORT",
+		"ADMIN_PORT"
+	],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build", "prisma:generate"],
+			"outputs": ["dist/**"]
+		},
+		"dev": {
+			"dependsOn": ["^build", "prisma:generate"],
+			"cache": false,
+			"persistent": true,
+			"env": [
+				"NODE_ENV",
+				"CORS_ORIGINS",
+				"REDIS_HOST",
+				"REDIS_PORT",
+				"PROXY",
+				"VITE_SERVER_URL",
+				"VITE_APP_URL",
+				"VITE_ADMIN_URL"
+			]
+		},
+		"check-types": {
+			"dependsOn": ["^build", "prisma:generate"]
+		},
+		"test": {
+			"dependsOn": ["^build", "prisma:generate"]
+		},
+		"prisma:generate": {
+			"cache": false
+		},
+		"prisma:migrate": {
+			"cache": false,
+			"interactive": true,
+			"env": ["DATABASE_URL"]
+		},
+		"prisma:studio": {
+			"cache": false,
+			"persistent": true,
+			"interactive": true
+		}
+	}
+}

@@ -1,0 +1,42 @@
+{
+	"name": "raftlabs",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@12.4.2",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"dev": "turbo dev",
+		"dev:app": "turbo dev --filter app",
+		"dev:admin": "turbo dev --filter admin",
+		"dev:server": "turbo dev --filter server",
+		"build": "turbo build",
+		"test": "turbo test",
+		"check-types": "turbo run check-types",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"check": "biome check --write .",
+		"docker:development:build": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml build",
+		"docker:development:up": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d",
+		"docker:development:start": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d --build",
+		"docker:development:down": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml down",
+		"docker:development:logs": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml logs -f",
+		"docker:development:reset": "docker compose --env-file env/.env.development -f docker/docker-compose.development.yml down -v && docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d",
+		"docker:production:build": "docker compose --env-file env/.env.production -f docker/docker-compose.production.yml build",
+		"docker:production:up": "docker compose --env-file env/.env.production -f docker/docker-compose.production.yml up -d",
+		"docker:production:start": "docker compose --env-file env/.env.production -f docker/docker-compose.production.yml up -d --build",
+		"docker:production:down": "docker compose --env-file env/.env.production -f docker/docker-compose.production.yml down",
+		"docker:production:logs": "docker compose --env-file env/.env.production -f docker/docker-compose.production.yml logs -f",
+		"prisma:generate": "pnpm --filter server prisma:generate",
+		"prisma:migrate": "turbo run prisma:migrate --filter server",
+		"prisma:deploy": "pnpm --filter server prisma:deploy",
+		"prisma:seed": "pnpm --filter server prisma:seed",
+		"prisma:studio": "turbo run prisma:studio --filter server"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.15",
+		"turbo": "^2.11.7",
+		"typescript": "^7.0.2"
+	}
+}

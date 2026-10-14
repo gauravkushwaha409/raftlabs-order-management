@@ -1,0 +1,21 @@
+node_modules
+.pnpm-store
+
+# env: only the template is committed
+.env
+.env.local
+env/.env.*
+!env/.env.example
+
+coverage
+.turbo
+.vercel
+out
+build
+dist
+*.tsbuildinfo
+
+# Prisma generated client
+**/src/generated
+
+npm-debug.log*
