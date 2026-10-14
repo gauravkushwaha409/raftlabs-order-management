@@ -20,6 +20,8 @@
 			"env": [
 				"NODE_ENV",
 				"CORS_ORIGINS",
+				"ADMIN_API_KEY",
+				"ORDER_STEP_MS",
 				"REDIS_HOST",
 				"REDIS_PORT",
 				"PROXY",
