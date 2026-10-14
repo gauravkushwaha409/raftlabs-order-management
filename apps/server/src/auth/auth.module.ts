@@ -1,18 +1,15 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
+import { PassportModule } from "@nestjs/passport";
 import { AuthController } from "./controller/auth.controller.js";
 import { AdminGuard, AuthGuard } from "./guard/auth.guard.js";
 import { AuthService } from "./service/auth.service.js";
-
-function jwtSecret() {
-	const secret = process.env.JWT_SECRET;
-	if (!secret || secret.length < 32)
-		throw new Error("JWT_SECRET must be set to at least 32 characters");
-	return secret;
-}
+import { JwtStrategy } from "./strategy/jwt.strategy.js";
+import { jwtSecret } from "./util/jwt-secret.js";
 
 @Module({
 	imports: [
+		PassportModule,
 		JwtModule.registerAsync({
 			useFactory: () => ({
 				secret: jwtSecret(),
@@ -21,7 +18,7 @@ function jwtSecret() {
 		}),
 	],
 	controllers: [AuthController],
-	providers: [AuthService, AuthGuard, AdminGuard],
+	providers: [AuthService, JwtStrategy, AuthGuard, AdminGuard],
 	exports: [AuthService, AuthGuard, AdminGuard],
 })
 export class AuthModule {}

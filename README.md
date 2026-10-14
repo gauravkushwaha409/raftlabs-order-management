@@ -44,7 +44,7 @@ Override credentials with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / 
 ## Auth
 
 - Email + password accounts (`User` table, roles `CUSTOMER` / `ADMIN`). Passwords are hashed with scrypt and a per-password salt.
-- Sessions are a signed JWT in an **httpOnly** cookie (`access_token`, 7 days), so page scripts can never read it. The user is re-read from the DB on every request, so deleted or demoted accounts lose access immediately.
+- Sessions are a signed JWT in an **httpOnly** cookie (`access_token`, 7 days), so page scripts can never read it. Requests are validated by a Passport JWT strategy (`AuthGuard`/`AdminGuard`); the user is re-read from the DB on every request, so deleted or demoted accounts lose access immediately. New methods (OAuth, API keys, …) plug in as extra strategies without touching the guards.
 - Apps on a different site than the API: set `COOKIE_SAME_SITE=none` (forces `Secure`) and list the app origins in `VITE_APP_URL` / `VITE_ADMIN_URL` / `CORS_ORIGINS`. All API bodies are JSON, so cross-origin writes need a CORS preflight, which only allow-listed origins pass.
 - Login and register are limited to 10 requests/min per IP, everything else to 100/min. Behind a reverse proxy set `TRUST_PROXY=1`.
 - Customers must be signed in to order and can only see their own orders (anyone else gets a 404, also on the SSE stream). Admins see everything. The admin app only accepts `ADMIN` accounts.

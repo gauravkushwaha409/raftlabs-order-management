@@ -65,11 +65,16 @@ export class AuthService {
 		if (!token) return null;
 		try {
 			const { sub } = await this.jwt.verifyAsync<{ sub: string }>(token);
-			const user = await this.prisma.user.findUnique({ where: { id: sub } });
-			return user ? toAuthUser(user) : null;
+			return await this.resolveUser(sub);
 		} catch {
 			return null;
 		}
+	}
+
+	/** Live user for a verified `sub` claim, or null. Shared by the JWT strategy and the websocket handshake. */
+	async resolveUser(sub: string): Promise<AuthUser | null> {
+		const user = await this.prisma.user.findUnique({ where: { id: sub } });
+		return user ? toAuthUser(user) : null;
 	}
 
 	private sign(userId: string) {
