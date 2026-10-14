@@ -32,6 +32,10 @@
 		"prisma:migrate": "turbo run prisma:migrate --filter server",
 		"prisma:deploy": "pnpm --filter server prisma:deploy",
 		"prisma:seed": "pnpm --filter server prisma:seed",
+		"prisma:development:seed": "SEED_MODE=development pnpm --filter server prisma:seed",
+		"prisma:staging:seed": "SEED_MODE=staging pnpm --filter server prisma:seed",
+		"prisma:production:seed": "SEED_MODE=production pnpm --filter server prisma:seed",
+		"prisma:reset:hard": "pnpm --filter server exec prisma migrate reset --force && pnpm prisma:seed",
 		"prisma:studio": "turbo run prisma:studio --filter server"
 	},
 	"devDependencies": {

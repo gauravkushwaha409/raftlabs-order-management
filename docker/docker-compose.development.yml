@@ -41,7 +41,7 @@ services:
       context: ..
       dockerfile: apps/server/docker/Dockerfile.development
     restart: unless-stopped
-    command: sh -c "pnpm --filter server prisma:generate && pnpm --filter server prisma:deploy && pnpm --filter server dev"
+    command: sh -c "pnpm --filter server prisma:generate && pnpm --filter server prisma:deploy && pnpm --filter server prisma:seed && pnpm --filter server dev"
     ports:
       - "${SERVER_PORT:?SERVER_PORT must be set in env/.env.development}:${SERVER_PORT}"
     healthcheck:
