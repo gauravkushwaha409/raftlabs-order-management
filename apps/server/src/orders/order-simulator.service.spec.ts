@@ -28,11 +28,13 @@ async function setup() {
 describe("OrderSimulatorService", () => {
 	beforeEach(() => {
 		process.env.ORDER_STEP_MS = "1000";
+		process.env.ORDER_SIMULATOR_ENABLED = "true";
 		vi.useFakeTimers();
 	});
 	afterEach(() => {
 		vi.useRealTimers();
 		delete process.env.ORDER_STEP_MS;
+		delete process.env.ORDER_SIMULATOR_ENABLED;
 	});
 
 	it("walks a new order through every status", async () => {
@@ -100,5 +102,19 @@ describe("OrderSimulatorService", () => {
 			"RECEIVED",
 		);
 		restarted.onModuleDestroy();
+	});
+
+	it("stays idle when the simulator is disabled", async () => {
+		delete process.env.ORDER_SIMULATOR_ENABLED;
+		const { orders, simulator, pizza } = await setup();
+		const { id } = await orders.create(USER_ID, {
+			...customer,
+			items: [{ menuItemId: pizza.id, quantity: 1 }],
+		});
+
+		await vi.advanceTimersByTimeAsync(5000);
+
+		expect((await orders.get(id)).status).toBe("RECEIVED");
+		simulator.onModuleDestroy();
 	});
 });

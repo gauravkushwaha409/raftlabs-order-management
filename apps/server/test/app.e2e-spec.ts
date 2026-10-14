@@ -27,7 +27,8 @@ describe("API (e2e)", () => {
 
 	beforeAll(async () => {
 		process.env.JWT_SECRET = "e2e-secret-e2e-secret-e2e-secret-1234";
-		process.env.ORDER_STEP_MS = "3600000"; // keep the simulator out of the way
+		// The status simulator is opt-in (ORDER_SIMULATOR_ENABLED=true) and stays
+		// off here, so orders only move through explicit admin actions.
 		prisma = new FakePrisma();
 		prisma.addUser({
 			email: ADMIN.email,
@@ -54,7 +55,7 @@ describe("API (e2e)", () => {
 
 	afterAll(async () => {
 		await app.close();
-		for (const key of ["JWT_SECRET", "ORDER_STEP_MS"]) delete process.env[key];
+		for (const key of ["JWT_SECRET"]) delete process.env[key];
 	});
 
 	const cookieFrom = (response: request.Response) =>

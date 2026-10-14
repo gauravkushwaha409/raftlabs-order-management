@@ -70,7 +70,7 @@ Status flow: `RECEIVED → PREPARING → OUT_FOR_DELIVERY → DELIVERED`; `CANCE
 
 ## How real time works
 
-- A simulator walks each new order through the statuses every `ORDER_STEP_MS` (default 10 s). Steps are compare-and-set updates, so several server instances or an admin overriding a status never double-advance an order. Unfinished orders resume after a restart.
+- An opt-in simulator (`ORDER_SIMULATOR_ENABLED=true`) walks each new order through the statuses every `ORDER_STEP_MS` (default 10 s). Steps are compare-and-set updates, so several server instances or an admin overriding a status never double-advance an order. Unfinished orders resume after a restart. By default the simulator is off and statuses change only through explicit admin actions.
 - Every change is published on a Redis channel; each instance forwards it to SSE streams (owners) and the `/admin` socket.io namespace (admins only; the handshake carries the session cookie).
 
 ## Commands

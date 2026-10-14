@@ -10,10 +10,18 @@ import { OrdersService } from "./orders.service.js";
 
 const DEFAULT_STEP_MS = 10_000;
 
+/** Opt-in: only "true" enables automatic status advancement. */
+export function isSimulatorEnabled(): boolean {
+	return process.env.ORDER_SIMULATOR_ENABLED === "true";
+}
+
 /**
  * Simulates the kitchen and courier: walks every order RECEIVED -> PREPARING -> OUT_FOR_DELIVERY
  * -> DELIVERED, one step per ORDER_STEP_MS. Each step is a compare-and-set, so running several
  * instances (or an admin overriding the status) never double-advances an order.
+ *
+ * Opt-in via ORDER_SIMULATOR_ENABLED=true. When disabled (the default), order
+ * statuses only change through explicit admin/user actions.
  */
 @Injectable()
 export class OrderSimulatorService
@@ -28,6 +36,7 @@ export class OrderSimulatorService
 	) {}
 
 	async onApplicationBootstrap() {
+		if (!isSimulatorEnabled()) return;
 		this.subscription = this.events.stream$.subscribe((event) => {
 			if (event.type === "created")
 				this.schedule(event.order.id, event.order.status);
