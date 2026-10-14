@@ -8,12 +8,27 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
 enum OrderStatus {
   RECEIVED
   PREPARING
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  orders       Order[]
 }
 
 model MenuItem {
@@ -35,11 +50,14 @@ model Order {
   phone        String
   status       OrderStatus @default(RECEIVED)
   totalCents   Int
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Restrict)
   items        OrderItem[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   @@index([status])
+  @@index([userId])
   @@index([createdAt])
 }
 
