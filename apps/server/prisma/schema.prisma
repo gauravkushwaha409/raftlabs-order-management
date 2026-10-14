@@ -7,3 +7,52 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  name        String
+  description String
+  priceCents  Int
+  image       String
+  category    String
+  available   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  customerName String
+  address      String
+  phone        String
+  status       OrderStatus @default(RECEIVED)
+  totalCents   Int
+  items        OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// name/priceCents are snapshots taken at order time so later menu edits never change past orders.
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  name       String
+  priceCents Int
+  quantity   Int
+
+  @@index([orderId])
+}
