@@ -29,9 +29,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 				: `Request failed (${response.status})`;
 		throw new ApiError(message, response.status);
 	}
-	return response.status === 204
-		? (undefined as T)
-		: (response.json() as Promise<T>);
+	if (response.status === 204) return undefined as T;
+	const body = (await response.json()) as { success: true; data: T } | T;
+	// The API wraps every payload in { success, statusCode, message, data }.
+	return typeof body === "object" &&
+		body !== null &&
+		(body as { success?: unknown }).success === true &&
+		"data" in body
+		? (body as { data: T }).data
+		: (body as T);
 }
 
 export const register = (input: {

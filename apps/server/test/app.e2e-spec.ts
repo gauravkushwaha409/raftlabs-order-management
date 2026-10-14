@@ -71,7 +71,7 @@ describe("API (e2e)", () => {
 			.expect(201);
 		return {
 			cookie: cookieFrom(response),
-			user: response.body as { id: string; email: string },
+			user: response.body.data as { id: string; email: string },
 		};
 	}
 
@@ -90,12 +90,22 @@ describe("API (e2e)", () => {
 
 	describe("health + menu", () => {
 		it("GET /api/v1 is healthy", () =>
-			http.get("/api/v1").expect(200, { status: "ok" }));
+			http
+				.get("/api/v1")
+				.expect(200)
+				.expect((res) =>
+					expect(res.body).toEqual({
+						success: true,
+						statusCode: 200,
+						message: "Data fetched successfully",
+						data: { status: "ok" },
+					}),
+				));
 
 		it("GET /api/v1/menu is public", async () => {
 			const { body } = await http.get("/api/v1/menu").expect(200);
-			expect(body).toHaveLength(2);
-			expect(body[0]).toEqual(
+			expect(body.data).toHaveLength(2);
+			expect(body.data[0]).toEqual(
 				expect.objectContaining({
 					name: expect.any(String),
 					priceCents: expect.any(Number),
@@ -115,7 +125,7 @@ describe("API (e2e)", () => {
 				})
 				.expect(201);
 
-			expect(response.body).toEqual({
+			expect(response.body.data).toEqual({
 				id: expect.any(String),
 				email: "grace@example.com",
 				name: "Grace Hopper",
@@ -165,7 +175,7 @@ describe("API (e2e)", () => {
 				.post("/api/v1/auth/login")
 				.send({ email: user.email, password: "analytical-engine" })
 				.expect(200);
-			expect(ok.body).toMatchObject({ email: user.email, role: "CUSTOMER" });
+			expect(ok.body.data).toMatchObject({ email: user.email, role: "CUSTOMER" });
 			expect(cookieFrom(ok)).toMatch(/^access_token=/);
 
 			const wrong = await http
@@ -187,7 +197,7 @@ describe("API (e2e)", () => {
 				.get("/api/v1/auth/me")
 				.set("Cookie", cookie)
 				.expect(200)
-				.expect((res) => expect(res.body.email).toBe(user.email));
+				.expect((res) => expect(res.body.data.email).toBe(user.email));
 		});
 
 		it("logout clears the cookie", async () => {
@@ -206,7 +216,7 @@ describe("API (e2e)", () => {
 				.post("/api/v1/auth/login")
 				.send(ADMIN)
 				.expect(200);
-			expect(response.body.role).toBe("ADMIN");
+			expect(response.body.data.role).toBe("ADMIN");
 		});
 	});
 
@@ -221,17 +231,17 @@ describe("API (e2e)", () => {
 			const { cookie, user } = await signUp();
 			const { body } = await placeOrder(cookie).expect(201);
 
-			expect(body).toMatchObject({
+			expect(body.data).toMatchObject({
 				status: "RECEIVED",
 				totalCents: 2000,
 				customerName: "Ada Lovelace",
 			});
-			expect(body.items).toEqual([
+			expect(body.data.items).toEqual([
 				{ menuItemId: pizzaId, name: "Pizza", priceCents: 1000, quantity: 2 },
 			]);
-			expect(prisma.orders.find((order) => order.id === body.id)?.userId).toBe(
-				user.id,
-			);
+			expect(
+				prisma.orders.find((order) => order.id === body.data.id)?.userId,
+			).toBe(user.id);
 		});
 
 		it("ignores client-supplied prices, totals and owners", async () => {
@@ -243,10 +253,10 @@ describe("API (e2e)", () => {
 				items: [{ menuItemId: pizzaId, quantity: 1, priceCents: 1 }],
 			}).expect(201);
 
-			expect(body.totalCents).toBe(1000);
-			expect(prisma.orders.find((order) => order.id === body.id)?.userId).toBe(
-				user.id,
-			);
+			expect(body.data.totalCents).toBe(1000);
+			expect(
+				prisma.orders.find((order) => order.id === body.data.id)?.userId,
+			).toBe(user.id);
 		});
 
 		it.each([
@@ -300,12 +310,21 @@ describe("API (e2e)", () => {
 			const owner = await signUp();
 			const stranger = await signUp();
 			const adminCookie = await signInAdmin();
-			const { body: order } = await placeOrder(owner.cookie).expect(201);
+			const { body: created } = await placeOrder(owner.cookie).expect(201);
+			const order = created.data as { id: string };
 			const url = `/api/v1/orders/${order.id}`;
 
 			await http.get(url).expect(401);
-			await http.get(url).set("Cookie", owner.cookie).expect(200, order);
-			await http.get(url).set("Cookie", adminCookie).expect(200, order);
+			await http
+				.get(url)
+				.set("Cookie", owner.cookie)
+				.expect(200)
+				.expect((res) => expect(res.body.data).toEqual(order));
+			await http
+				.get(url)
+				.set("Cookie", adminCookie)
+				.expect(200)
+				.expect((res) => expect(res.body.data).toEqual(order));
 			await http.get(url).set("Cookie", stranger.cookie).expect(404);
 		});
 
@@ -332,14 +351,17 @@ describe("API (e2e)", () => {
 				.get("/api/v1/orders/mine")
 				.set("Cookie", me.cookie)
 				.expect(200);
-			expect(body.map((order: { id: string }) => order.id)).toEqual([mine.id]);
+			expect(body.data.map((order: { id: string }) => order.id)).toEqual([
+				mine.data.id,
+			]);
 		});
 	});
 
 	describe("admin endpoints", () => {
 		it("reject anonymous callers with 401 and customers with 403", async () => {
 			const { cookie } = await signUp();
-			const { body: order } = await placeOrder(cookie).expect(201);
+			const { body: created } = await placeOrder(cookie).expect(201);
+			const order = created.data as { id: string };
 
 			await http.get("/api/v1/orders").expect(401);
 			await http.get("/api/v1/orders").set("Cookie", cookie).expect(403);
@@ -361,7 +383,8 @@ describe("API (e2e)", () => {
 		it("GET /orders lists everything, filters by status and validates the query", async () => {
 			const { cookie } = await signUp();
 			const adminCookie = await signInAdmin();
-			const { body: order } = await placeOrder(cookie).expect(201);
+			const { body: created } = await placeOrder(cookie).expect(201);
+			const order = created.data as { id: string };
 			await http
 				.patch(`/api/v1/orders/${order.id}/status`)
 				.set("Cookie", adminCookie)
@@ -372,13 +395,15 @@ describe("API (e2e)", () => {
 				.get("/api/v1/orders")
 				.set("Cookie", adminCookie)
 				.expect(200);
-			expect(all.body.length).toBeGreaterThan(1);
+			expect(all.body.data.length).toBeGreaterThan(1);
 			const cancelled = await http
 				.get("/api/v1/orders?status=CANCELLED")
 				.set("Cookie", adminCookie)
 				.expect(200);
 			expect(
-				cancelled.body.every((o: { status: string }) => o.status === "CANCELLED"),
+				cancelled.body.data.every(
+					(o: { status: string }) => o.status === "CANCELLED",
+				),
 			).toBe(true);
 			await http
 				.get("/api/v1/orders?status=BOGUS")
@@ -388,13 +413,14 @@ describe("API (e2e)", () => {
 				.get("/api/v1/orders?limit=1")
 				.set("Cookie", adminCookie)
 				.expect(200)
-				.expect((res) => expect(res.body).toHaveLength(1));
+				.expect((res) => expect(res.body.data).toHaveLength(1));
 		});
 
 		it("PATCH walks the lifecycle and rejects bad transitions", async () => {
 			const { cookie } = await signUp();
 			const adminCookie = await signInAdmin();
-			const { body: order } = await placeOrder(cookie).expect(201);
+			const { body: created } = await placeOrder(cookie).expect(201);
+			const order = created.data as { id: string };
 			const patch = (status: string) =>
 				http
 					.patch(`/api/v1/orders/${order.id}/status`)
@@ -403,7 +429,7 @@ describe("API (e2e)", () => {
 
 			await patch("PREPARING")
 				.expect(200)
-				.expect((res) => expect(res.body.status).toBe("PREPARING"));
+				.expect((res) => expect(res.body.data.status).toBe("PREPARING"));
 			await patch("DELIVERED").expect(409);
 			await patch("OUT_FOR_DELIVERY").expect(200);
 			await patch("DELIVERED").expect(200);
@@ -419,7 +445,8 @@ describe("API (e2e)", () => {
 		it("DELETE removes the order", async () => {
 			const { cookie } = await signUp();
 			const adminCookie = await signInAdmin();
-			const { body: order } = await placeOrder(cookie).expect(201);
+			const { body: created } = await placeOrder(cookie).expect(201);
+			const order = created.data as { id: string };
 
 			await http
 				.delete(`/api/v1/orders/${order.id}`)
@@ -440,7 +467,8 @@ describe("API (e2e)", () => {
 		it("rejects anonymous callers and hides other users' orders", async () => {
 			const owner = await signUp();
 			const stranger = await signUp();
-			const { body: order } = await placeOrder(owner.cookie).expect(201);
+			const { body: created } = await placeOrder(owner.cookie).expect(201);
+			const order = created.data as { id: string };
 
 			await http.get(`/api/v1/orders/${order.id}/events`).expect(401);
 			await http
@@ -452,7 +480,8 @@ describe("API (e2e)", () => {
 		it("streams the current status then live updates until the order is final", async () => {
 			const owner = await signUp();
 			const adminCookie = await signInAdmin();
-			const { body: order } = await placeOrder(owner.cookie).expect(201);
+			const { body: created } = await placeOrder(owner.cookie).expect(201);
+			const order = created.data as { id: string };
 
 			const response = await fetch(`${baseUrl}/api/v1/orders/${order.id}/events`, {
 				headers: { cookie: owner.cookie },
