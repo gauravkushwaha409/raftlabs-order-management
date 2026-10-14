@@ -97,6 +97,40 @@ export class FakePrisma {
 			this.menuItems
 				.filter((item) => matches(item, where))
 				.map((item) => pick(item, select)),
+		findUnique: async ({ where }: { where: { id: string } }) =>
+			this.menuItems.find((item) => item.id === where.id) ?? null,
+		create: async ({
+			data,
+			select,
+		}: {
+			data: Omit<MenuItem, "id" | "createdAt">;
+			select?: Record<string, boolean>;
+		}) => {
+			const item: MenuItem = {
+				id: randomUUID(),
+				createdAt: new Date(),
+				...data,
+			};
+			this.menuItems.push(item);
+			return pick(item, select);
+		},
+		update: async ({
+			where,
+			data,
+			select,
+		}: {
+			where: { id: string };
+			data: Partial<MenuItem>;
+			select?: Record<string, boolean>;
+		}) => {
+			const item = this.menuItems.find((entry) => entry.id === where.id);
+			if (!item) throw Object.assign(new Error("not found"), { code: "P2025" });
+			Object.assign(item, data);
+			return pick(item, select);
+		},
+		delete: async ({ where }: { where: { id: string } }) => {
+			this.menuItems = this.menuItems.filter((item) => item.id !== where.id);
+		},
 	};
 
 	order = {

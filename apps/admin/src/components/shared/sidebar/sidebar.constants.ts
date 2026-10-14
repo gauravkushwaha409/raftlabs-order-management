@@ -1,4 +1,4 @@
-import { Settings, ShoppingCart } from "lucide-react";
+import { Settings, ShoppingCart, UtensilsCrossed } from "lucide-react";
 import type { SidebarItems } from "./sidebar.types";
 
 export const SIDEBAR_WIDTH = "220px";
@@ -14,6 +14,12 @@ export const getSidebarData = (): SidebarItems => ({
 			label: "Orders",
 			icon: ShoppingCart,
 			path: "/",
+		},
+		{
+			label: "Food Items",
+			icon: UtensilsCrossed,
+			path: "/food-items",
+			matchPath: "/food-items",
 		},
 	],
 	LOWER: [

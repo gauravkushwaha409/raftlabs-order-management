@@ -83,9 +83,9 @@ export const MENU_SEED = [
 
 /** Dev/staging demo accounts. Production never uses these: it only seeds credentials passed via env. */
 export const DEMO_ACCOUNTS = {
-	admin: { email: "admin@example.com", password: "Admin@12345", name: "Admin" },
+	admin: { email: "admin@raftlabs.com", password: "Admin@12345", name: "Admin" },
 	customer: {
-		email: "customer@example.com",
+		email: "customer@raftlabs.com",
 		password: "Customer@12345",
 		name: "Demo Customer",
 	},

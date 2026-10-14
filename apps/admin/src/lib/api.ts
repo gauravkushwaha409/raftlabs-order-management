@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, User } from "@/types/api";
+import type { MenuItem, MenuItemInput, Order, OrderStatus, User } from "@/types/api";
 
 // Dev/docker: same-origin via the Vite proxy. Hosted: absolute URL baked in at build time.
 export const SERVER_ORIGIN = __PROXY_ENABLED__
@@ -56,3 +56,14 @@ export const updateOrderStatus = (id: string, status: OrderStatus) =>
 	});
 export const deleteOrder = (id: string) =>
 	request<void>(`/orders/${id}`, { method: "DELETE" });
+
+export const listMenuItems = () => request<MenuItem[]>("/menu/all");
+export const createMenuItem = (input: MenuItemInput) =>
+	request<MenuItem>("/menu", { method: "POST", body: JSON.stringify(input) });
+export const updateMenuItem = (id: string, input: Partial<MenuItemInput>) =>
+	request<MenuItem>(`/menu/${id}`, {
+		method: "PATCH",
+		body: JSON.stringify(input),
+	});
+export const deleteMenuItem = (id: string) =>
+	request<void>(`/menu/${id}`, { method: "DELETE" });

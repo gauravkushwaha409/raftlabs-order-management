@@ -37,3 +37,22 @@ export interface User {
 	name: string;
 	role: "CUSTOMER" | "ADMIN";
 }
+
+export interface MenuItem {
+	id: string;
+	name: string;
+	description: string;
+	priceCents: number;
+	image: string;
+	category: string;
+	available: boolean;
+}
+
+export interface MenuItemInput {
+	name: string;
+	description: string;
+	priceCents: number;
+	image: string;
+	category: string;
+	available: boolean;
+}
