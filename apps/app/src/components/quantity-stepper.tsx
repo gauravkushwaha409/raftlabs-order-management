@@ -24,6 +24,7 @@ export function QuantityStepper({
 				className="w-[34px]"
 				aria-label={`Decrease quantity of ${label}`}
 				icon={MinusIcon}
+				disabled={quantity <= 1}
 				onClick={() => onChange(quantity - 1)}
 			/>
 			<output

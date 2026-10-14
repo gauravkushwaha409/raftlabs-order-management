@@ -1,15 +1,17 @@
 import { Button } from "@package/ui";
 import { Link } from "@tanstack/react-router";
-import { ShoppingBagIcon } from "lucide-react";
+import { CheckIcon, ShoppingBagIcon } from "lucide-react";
 import { formatPrice } from "@/lib/money";
 import type { MenuItem } from "@/types/api";
 
 interface MenuCardProps {
 	item: MenuItem;
+	/** True when the item is already in the cart; shows an "In cart" state instead. */
+	inCart?: boolean;
 	onAdd: (item: MenuItem) => void;
 }
 
-export function MenuCard({ item, onAdd }: MenuCardProps) {
+export function MenuCard({ item, inCart = false, onAdd }: MenuCardProps) {
 	return (
 		<article className="flex flex-col overflow-hidden rounded-xl border border-gray-border-200 bg-white-base">
 			<Link
@@ -40,14 +42,26 @@ export function MenuCard({ item, onAdd }: MenuCardProps) {
 				</div>
 				<p className="typo-t4 flex-1 text-gray-500">{item.description}</p>
 				<div className="mt-3">
-					<Button
-						size="sm"
-						leftIcon={ShoppingBagIcon}
-						aria-label={`Add ${item.name} to cart`}
-						onClick={() => onAdd(item)}
-					>
-						Add to cart
-					</Button>
+					{inCart ? (
+						<Button
+							size="sm"
+							variant="secondary"
+							leftIcon={CheckIcon}
+							aria-label={`${item.name} is already in the cart`}
+							disabled
+						>
+							In cart
+						</Button>
+					) : (
+						<Button
+							size="sm"
+							leftIcon={ShoppingBagIcon}
+							aria-label={`Add ${item.name} to cart`}
+							onClick={() => onAdd(item)}
+						>
+							Add to cart
+						</Button>
+					)}
 				</div>
 			</div>
 		</article>

@@ -64,6 +64,21 @@ describe("MenuDetailsPage", () => {
 		expect(useCart.getState().lines).toEqual([{ item: menu[0], quantity: 1 }]);
 	});
 
+	it("shows an in-cart state once the item is added", async () => {
+		vi.mocked(getMenu).mockResolvedValue(menu);
+		await renderWithRouter(<MenuDetailsPage itemId="pizza" />);
+		const user = userEvent.setup();
+
+		await user.click(
+			await screen.findByRole("button", { name: "Add Margherita to cart" }),
+		);
+		expect(
+			await screen.findByRole("button", {
+				name: "Margherita is already in the cart",
+			}),
+		).toBeInTheDocument();
+	});
+
 	it("shows a not-available state for an unknown item", async () => {
 		vi.mocked(getMenu).mockResolvedValue(menu);
 		await renderWithRouter(<MenuDetailsPage itemId="ghost" />);

@@ -66,6 +66,19 @@ describe("MenuCard", () => {
 		).toBeInTheDocument();
 	});
 
+	it("shows an in-cart state instead of the add button", async () => {
+		await renderWithRouter(<MenuCard item={item} inCart onAdd={vi.fn()} />);
+
+		expect(
+			screen.getByRole("button", {
+				name: "Margherita Pizza is already in the cart",
+			}),
+		).toHaveTextContent("In cart");
+		expect(
+			screen.queryByRole("button", { name: "Add Margherita Pizza to cart" }),
+		).not.toBeInTheDocument();
+	});
+
 	it("links to the food details page", async () => {
 		await renderWithRouter(<MenuCard item={item} onAdd={vi.fn()} />);
 

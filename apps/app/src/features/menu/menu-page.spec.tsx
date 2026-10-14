@@ -98,11 +98,17 @@ describe("MenuPage", () => {
 		);
 		expect(useCart.getState().lines).toEqual([{ item: menu[1], quantity: 1 }]);
 
-		// Tapping add again does not bump the quantity; that happens in the cart.
-		await user.click(
-			screen.getByRole("button", { name: "Add Margherita to cart" }),
-		);
+		// The card now reports the in-cart state instead of offering Add again,
+		// so repeated taps can't bump the quantity from the list.
+		expect(
+			await screen.findByRole("button", {
+				name: "Margherita is already in the cart",
+			}),
+		).toBeInTheDocument();
 		expect(useCart.getState().lines[0]?.quantity).toBe(1);
+		expect(
+			screen.queryByRole("button", { name: "Add Margherita to cart" }),
+		).not.toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: /quantity of/i }),
 		).not.toBeInTheDocument();

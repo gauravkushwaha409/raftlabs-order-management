@@ -1,13 +1,16 @@
 import { useQuery } from "@package/query";
 import { Badge, Button } from "@package/ui";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, ShoppingBagIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, ShoppingBagIcon } from "lucide-react";
 import { getMenu } from "@/lib/api";
 import { formatPrice } from "@/lib/money";
 import { useCart } from "@/stores/cart.store";
 
 export function MenuDetailsPage({ itemId }: { itemId: string }) {
 	const menu = useQuery(["menu"], getMenu);
+	const inCart = useCart((state) =>
+		state.lines.some((line) => line.item.id === itemId),
+	);
 	const { add } = useCart.getState();
 
 	if (menu.isPending) {
@@ -89,14 +92,26 @@ export function MenuDetailsPage({ itemId }: { itemId: string }) {
 					</div>
 					<p className="typo-t2 text-gray-500">{item.description}</p>
 					<div className="mt-2 flex flex-wrap items-center gap-3">
-						<Button
-							className="w-auto"
-							leftIcon={ShoppingBagIcon}
-							aria-label={`Add ${item.name} to cart`}
-							onClick={() => add(item)}
-						>
-							Add to cart
-						</Button>
+						{inCart ? (
+							<Button
+								className="w-auto"
+								variant="secondary"
+								leftIcon={CheckIcon}
+								aria-label={`${item.name} is already in the cart`}
+								disabled
+							>
+								In cart
+							</Button>
+						) : (
+							<Button
+								className="w-auto"
+								leftIcon={ShoppingBagIcon}
+								aria-label={`Add ${item.name} to cart`}
+								onClick={() => add(item)}
+							>
+								Add to cart
+							</Button>
+						)}
 						<p className="typo-t5 text-gray-500">
 							Adjust quantity anytime from the cart.
 						</p>
