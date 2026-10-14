@@ -1,7 +1,8 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { FakePrisma } from "../../../test/fakes.js";
+import { FakePrisma, FakeRedis } from "../../../test/fakes.js";
 import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { RedisService } from "../../redis/service/redis.service.js";
 import { AuthService } from "../service/auth.service.js";
 import { JwtStrategy } from "./jwt.strategy.js";
 
@@ -13,6 +14,7 @@ async function setup() {
 	const auth = new AuthService(
 		prisma as unknown as PrismaService,
 		new JwtService({ secret: SECRET }),
+		new FakeRedis() as unknown as RedisService,
 	);
 	const strategy = new JwtStrategy(auth);
 	const user = prisma.addUser({ email: "a@example.com" });

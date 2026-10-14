@@ -44,7 +44,7 @@ Override credentials with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / 
 ## Auth
 
 - Email + password accounts (`User` table, roles `CUSTOMER` / `ADMIN`). Passwords are hashed with scrypt and a per-password salt.
-- Sessions are a signed JWT in an **httpOnly** cookie (`access_token`, 7 days), so page scripts can never read it. Requests are validated by a Passport JWT strategy (`AuthGuard`/`AdminGuard`); the user is re-read from the DB on every request, so deleted or demoted accounts lose access immediately. New methods (OAuth, API keys, …) plug in as extra strategies without touching the guards.
+- Sessions are a signed JWT in an **httpOnly** cookie (`access_token`, 7 days), so page scripts can never read it. Requests are validated by a Passport JWT strategy (`AuthGuard`/`AdminGuard`); the user snapshot is cached in Redis for 60 s (`session:user:{id}`), so deleted or demoted accounts lose access within a minute. New methods (OAuth, API keys, …) plug in as extra strategies without touching the guards.
 - Apps on a different site than the API: set `COOKIE_SAME_SITE=none` (forces `Secure`) and list the app origins in `VITE_APP_URL` / `VITE_ADMIN_URL` / `CORS_ORIGINS`. All API bodies are JSON, so cross-origin writes need a CORS preflight, which only allow-listed origins pass.
 - Login and register are limited to 10 requests/min per IP, everything else to 100/min. Behind a reverse proxy set `TRUST_PROXY=1`.
 - Customers must be signed in to order and can only see their own orders (anyone else gets a 404, also on the SSE stream). Admins see everything. The admin app only accepts `ADMIN` accounts.
@@ -72,6 +72,12 @@ Status flow: `RECEIVED → PREPARING → OUT_FOR_DELIVERY → DELIVERED`; `CANCE
 
 - An opt-in simulator (`ORDER_SIMULATOR_ENABLED=true`) walks each new order through the statuses every `ORDER_STEP_MS` (default 10 s). Steps are compare-and-set updates, so several server instances or an admin overriding a status never double-advance an order. Unfinished orders resume after a restart. By default the simulator is off and statuses change only through explicit admin actions.
 - Every change is published on a Redis channel; each instance forwards it to SSE streams (owners) and the `/admin` socket.io namespace (admins only; the handshake carries the session cookie).
+
+## Caching (Redis, cache-aside)
+
+- Hot reads go to Redis first and fall back to Postgres: session users (`session:user:{id}`, 60 s), the public menu (`menu:list`, 5 min), order details (`order:{id}`, 30 s). All keys/TTLs live in `apps/server/src/redis/constant/redis-keys.ts`.
+- Writes invalidate: every menu mutation drops `menu:list`; every order write drops its `order:{id}`. Cache failures never fail a request — the DB stays the authority and the TTL bounds staleness.
+- Order lists are deliberately uncached (combinatorial keys, live sockets already keep them fresh).
 
 ## Commands
 

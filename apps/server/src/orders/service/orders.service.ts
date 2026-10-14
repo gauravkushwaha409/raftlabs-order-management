@@ -18,6 +18,11 @@ import {
 import type { AuthUser } from "../../auth/types/auth.types.js";
 import { PrismaService } from "../../prisma/service/prisma.service.js";
 import {
+	REDIS_KEYS,
+	REDIS_TTL_SECONDS,
+} from "../../redis/constant/redis-keys.js";
+import { RedisService } from "../../redis/service/redis.service.js";
+import {
 	canTransition,
 	isFinalStatus,
 	nextStatus,
@@ -29,11 +34,18 @@ import { OrderEventsService } from "./order-events.service.js";
 
 const withItems = { items: true } as const;
 
+/** Cached tracking read: the response view plus the owner id for the ownership check. */
+interface CachedOrder {
+	view: OrderView;
+	userId: string;
+}
+
 @Injectable()
 export class OrdersService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly events: OrderEventsService,
+		private readonly redis: RedisService,
 	) {}
 
 	async create(userId: string, dto: CreateOrderDto): Promise<OrderView> {
@@ -97,23 +109,40 @@ export class OrdersService {
 
 	/** An order as seen by `user`: owners and admins see it, everyone else gets the same 404 as a missing id. */
 	async getFor(user: AuthUser, id: string): Promise<OrderView> {
-		const order = await this.prisma.order.findUnique({
-			where: { id },
-			include: withItems,
-		});
-		if (!order || (user.role !== "ADMIN" && order.userId !== user.id)) {
+		const entry = await this.readOrder(id);
+		if (!entry || (user.role !== "ADMIN" && entry.userId !== user.id)) {
 			throw new NotFoundException(`Order ${id} not found`);
 		}
-		return toOrderView(order);
+		return entry.view;
 	}
 
 	async get(id: string): Promise<OrderView> {
-		const order = await this.prisma.order.findUnique({
+		const entry = await this.readOrder(id);
+		if (!entry) throw new NotFoundException(`Order ${id} not found`);
+		return entry.view;
+	}
+
+	/** Tracking read, cache-aside. Writes below invalidate the entry. */
+	private async readOrder(id: string): Promise<CachedOrder | null> {
+		const key = REDIS_KEYS.ORDER_DETAIL(id);
+		try {
+			const cached = await this.redis.getJson<CachedOrder>(key);
+			if (cached) return cached;
+		} catch {
+			// Fall through to the DB.
+		}
+		const row = await this.prisma.order.findUnique({
 			where: { id },
 			include: withItems,
 		});
-		if (!order) throw new NotFoundException(`Order ${id} not found`);
-		return toOrderView(order);
+		if (!row) return null;
+		const entry: CachedOrder = { view: toOrderView(row), userId: row.userId };
+		try {
+			await this.redis.setJson(key, entry, REDIS_TTL_SECONDS.ORDER_DETAIL);
+		} catch {
+			// Best-effort.
+		}
+		return entry;
 	}
 
 	/**
@@ -155,6 +184,7 @@ export class OrdersService {
 				throw new NotFoundException(`Order ${id} not found`);
 			throw error;
 		}
+		await this.invalidateOrder(id);
 		await this.events.publish({ type: "deleted", order });
 	}
 
@@ -197,8 +227,17 @@ export class OrdersService {
 			data: { status: to },
 		});
 		if (count === 0) return null;
+		await this.invalidateOrder(id);
 		const order = await this.get(id);
 		await this.events.publish({ type: "updated", order });
 		return order;
+	}
+
+	private async invalidateOrder(id: string): Promise<void> {
+		try {
+			await this.redis.del(REDIS_KEYS.ORDER_DETAIL(id));
+		} catch {
+			// Best-effort: the TTL still bounds staleness.
+		}
 	}
 }

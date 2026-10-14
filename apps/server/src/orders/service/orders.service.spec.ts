@@ -23,10 +23,15 @@ async function setup() {
 		new FakeRedis() as unknown as RedisService,
 	);
 	await events.onModuleInit();
-	const service = new OrdersService(prisma as unknown as PrismaService, events);
+	const redis = new FakeRedis();
+	const service = new OrdersService(
+		prisma as unknown as PrismaService,
+		events,
+		redis as unknown as RedisService,
+	);
 	const pizza = prisma.addMenuItem({ name: "Pizza", priceCents: 1000 });
 	const soda = prisma.addMenuItem({ name: "Soda", priceCents: 250 });
-	return { prisma, events, service, pizza, soda };
+	return { prisma, events, redis, service, pizza, soda };
 }
 
 describe("OrdersService", () => {
@@ -269,6 +274,40 @@ describe("OrdersService", () => {
 			};
 
 			await expect(service.remove(created.id)).rejects.toBeInstanceOf(
+				NotFoundException,
+			);
+		});
+	});
+
+	describe("detail cache", () => {
+		it("serves tracking reads from cache", async () => {
+			const { service, prisma, pizza } = await setup();
+			const created = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 1 }],
+			});
+			expect((await service.get(created.id)).status).toBe("RECEIVED");
+
+			// The DB row moved on, but the cached view still serves the read.
+			prisma.orders[0]!.status = "PREPARING";
+			expect((await service.get(created.id)).status).toBe("RECEIVED");
+		});
+
+		it("invalidates the entry on status changes and removals", async () => {
+			const { service, prisma, pizza } = await setup();
+			const created = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 1 }],
+			});
+			expect((await service.get(created.id)).status).toBe("RECEIVED");
+
+			await service.updateStatus(created.id, "PREPARING");
+			// Tamper the DB backwards: the read must still report the fresh write.
+			prisma.orders[0]!.status = "RECEIVED";
+			expect((await service.get(created.id)).status).toBe("PREPARING");
+
+			await service.remove(created.id);
+			await expect(service.get(created.id)).rejects.toBeInstanceOf(
 				NotFoundException,
 			);
 		});

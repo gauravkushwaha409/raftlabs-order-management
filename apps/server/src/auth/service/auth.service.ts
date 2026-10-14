@@ -5,6 +5,11 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/service/prisma.service.js";
+import {
+	REDIS_KEYS,
+	REDIS_TTL_SECONDS,
+} from "../../redis/constant/redis-keys.js";
+import { RedisService } from "../../redis/service/redis.service.js";
 import type { LoginDto, RegisterDto } from "../dto/auth.dto.js";
 import type { AuthUser } from "../types/auth.types.js";
 import { hashPassword, verifyPassword } from "../util/password.js";
@@ -24,6 +29,7 @@ export class AuthService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly jwt: JwtService,
+		private readonly redis: RedisService,
 	) {}
 
 	async register(dto: RegisterDto): Promise<{ user: AuthUser; token: string }> {
@@ -71,10 +77,25 @@ export class AuthService {
 		}
 	}
 
-	/** Live user for a verified `sub` claim, or null. Shared by the JWT strategy and the websocket handshake. */
+	/** Live user for a verified `sub` claim, or null. Cache-aside: the DB stays the authority, the entry expires quickly. */
 	async resolveUser(sub: string): Promise<AuthUser | null> {
+		const key = REDIS_KEYS.SESSION_USER(sub);
+		try {
+			const cached = await this.redis.getJson<AuthUser>(key);
+			if (cached) return cached;
+		} catch {
+			// Cache failure must never fail authentication; fall through to the DB.
+		}
 		const user = await this.prisma.user.findUnique({ where: { id: sub } });
-		return user ? toAuthUser(user) : null;
+		const authUser = user ? toAuthUser(user) : null;
+		if (authUser) {
+			try {
+				await this.redis.setJson(key, authUser, REDIS_TTL_SECONDS.SESSION_USER);
+			} catch {
+				// Best-effort: the next read simply hits the DB again.
+			}
+		}
+		return authUser;
 	}
 
 	private sign(userId: string) {

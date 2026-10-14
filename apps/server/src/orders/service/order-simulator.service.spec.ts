@@ -18,7 +18,11 @@ async function setup() {
 		new FakeRedis() as unknown as RedisService,
 	);
 	await events.onModuleInit();
-	const orders = new OrdersService(prisma as unknown as PrismaService, events);
+	const orders = new OrdersService(
+		prisma as unknown as PrismaService,
+		events,
+		new FakeRedis() as unknown as RedisService,
+	);
 	const simulator = new OrderSimulatorService(orders, events);
 	await simulator.onApplicationBootstrap();
 	const pizza = prisma.addMenuItem({ name: "Pizza", priceCents: 1000 });

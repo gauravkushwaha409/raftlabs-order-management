@@ -1,10 +1,14 @@
 import { NotFoundException } from "@nestjs/common";
-import { FakePrisma } from "../../../test/fakes.js";
+import { FakePrisma, FakeRedis } from "../../../test/fakes.js";
 import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { RedisService } from "../../redis/service/redis.service.js";
 import { MenuService } from "./menu.service.js";
 
-const service = (prisma: FakePrisma) =>
-	new MenuService(prisma as unknown as PrismaService);
+const service = (prisma: FakePrisma, redis = new FakeRedis()) =>
+	new MenuService(
+		prisma as unknown as PrismaService,
+		redis as unknown as RedisService,
+	);
 
 describe("MenuService", () => {
 	it("lists only available items with the public fields", async () => {
@@ -95,5 +99,23 @@ describe("MenuService", () => {
 			expect(query).toMatch(/FOR UPDATE/);
 			expect(query).toContain(existing.id);
 		}
+	});
+
+	it("serves the list from cache until a write invalidates it", async () => {
+		const prisma = new FakePrisma();
+		const redis = new FakeRedis();
+		const item = prisma.addMenuItem({ name: "Cached", priceCents: 100 });
+
+		expect(await service(prisma, redis).list()).toHaveLength(1);
+
+		// The DB row is gone, but the cached list still serves it.
+		prisma.menuItems = [];
+		expect(await service(prisma, redis).list()).toHaveLength(1);
+
+		// Any write drops the entry, so the next read is fresh.
+		prisma.menuItems = [item];
+		await service(prisma, redis).update(item.id, { name: "Fresh" });
+		prisma.menuItems = [];
+		expect(await service(prisma, redis).list()).toHaveLength(0);
 	});
 });

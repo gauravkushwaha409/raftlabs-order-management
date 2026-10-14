@@ -1,7 +1,8 @@
 import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { FakePrisma } from "../../../test/fakes.js";
+import { FakePrisma, FakeRedis } from "../../../test/fakes.js";
 import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { RedisService } from "../../redis/service/redis.service.js";
 import { verifyPassword } from "../util/password.js";
 import { AuthService } from "./auth.service.js";
 
@@ -13,10 +14,16 @@ function setup() {
 		secret: SECRET,
 		signOptions: { expiresIn: "7d" },
 	});
+	const redis = new FakeRedis();
 	return {
 		prisma,
 		jwt,
-		auth: new AuthService(prisma as unknown as PrismaService, jwt),
+		redis,
+		auth: new AuthService(
+			prisma as unknown as PrismaService,
+			jwt,
+			redis as unknown as RedisService,
+		),
 	};
 }
 
@@ -132,14 +139,31 @@ describe("AuthService", () => {
 		});
 
 		it("returns null once the user is gone", async () => {
-			const { auth, prisma } = setup();
+			const { auth, prisma, redis } = setup();
 			const { token } = await auth.register({
 				name: "Ada",
 				email: "ada@example.com",
 				password: "analytical-engine",
 			});
+			redis.clearStore(); // resolve against the DB, not a cached snapshot
 			prisma.users = [];
 			expect(await auth.authenticate(token)).toBeNull();
+		});
+
+		it("serves repeat validations from cache", async () => {
+			const { auth, prisma } = setup();
+			const { user, token } = await auth.register({
+				name: "Ada",
+				email: "ada@example.com",
+				password: "analytical-engine",
+			});
+
+			expect(await auth.authenticate(token)).toEqual(user);
+
+			// The DB row is gone, but the cached snapshot still validates.
+			// The TTL bounds this window; the DB stays the authority.
+			prisma.users = [];
+			expect(await auth.authenticate(token)).toEqual(user);
 		});
 	});
 });

@@ -248,6 +248,7 @@ class FakeSubscriber extends EventEmitter {
 /** In-memory pub/sub with the same duplicate/subscribe/publish shape as ioredis. */
 export class FakeRedis {
 	private readonly subscribers = new Set<FakeSubscriber>();
+	private readonly store = new Map<string, string>();
 
 	duplicate() {
 		const subscriber = new FakeSubscriber();
@@ -259,5 +260,38 @@ export class FakeRedis {
 		for (const subscriber of this.subscribers)
 			subscriber.emit("message", channel, message);
 		return this.subscribers.size;
+	}
+
+	/** Key-value cache mirroring the JSON helpers on RedisService (no expiry — tests control staleness by clearing). */
+	async get(key: string): Promise<string | null> {
+		return this.store.get(key) ?? null;
+	}
+
+	async set(key: string, value: string, ..._args: unknown[]): Promise<"OK"> {
+		this.store.set(key, value);
+		return "OK";
+	}
+
+	async del(...keys: string[]): Promise<number> {
+		let removed = 0;
+		for (const key of keys) if (this.store.delete(key)) removed += 1;
+		return removed;
+	}
+
+	async getJson<T>(key: string): Promise<T | null> {
+		const raw = await this.get(key);
+		return raw == null ? null : (JSON.parse(raw) as T);
+	}
+
+	async setJson(
+		key: string,
+		value: unknown,
+		_ttlSeconds: number,
+	): Promise<void> {
+		await this.set(key, JSON.stringify(value));
+	}
+
+	clearStore() {
+		this.store.clear();
 	}
 }
