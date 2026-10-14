@@ -24,14 +24,22 @@ pnpm prisma:deploy && pnpm dev             # run apps on the host
 Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`.
 ## Seed data
 
-On startup the server fills missing demo data (reruns never change existing rows): the 10-item menu plus two accounts, so you can sign in without registering.
+`pnpm prisma:seed` (script: `apps/server/prisma/seed.ts`, compiled with `tsconfig.seed.json`) fills demo data and is safe to rerun: existing rows are never changed. The dev Docker stack runs it automatically after migrating.
 
 | Role | Email | Password | Where |
 | --- | --- | --- | --- |
 | Customer | `customer@example.com` | `Customer@12345` | app (`:3000`) |
 | Admin | `admin@example.com` | `Admin@12345` | admin (`:3001`) |
 
-Override them with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / `CUSTOMER_PASSWORD`. Outside production the values above are the fallback when unset. In production nothing falls back to a default password: an account is only created when both its variables are set. Also change `JWT_SECRET` outside dev.
+`SEED_MODE` picks the env file and what is seeded:
+
+| Mode | Command | Seeds |
+| --- | --- | --- |
+| development (default) | `pnpm prisma:development:seed` | menu, both accounts, 2 past orders for the customer |
+| staging | `pnpm prisma:staging:seed` | menu, both accounts |
+| production | `ALLOW_PRODUCTION_SEED=true pnpm prisma:production:seed` | menu, plus only the accounts whose `ADMIN_*` / `CUSTOMER_*` email **and** password are set. Refuses without the flag and never uses the demo passwords |
+
+Override credentials with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / `CUSTOMER_PASSWORD`. `pnpm prisma:reset:hard` resets the DB, migrates and seeds. Seeding skips an email that already exists, so a database that already holds `admin@example.com` keeps its old password.
 
 ## Auth
 
