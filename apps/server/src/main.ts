@@ -5,7 +5,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { cleanupOpenApiDoc } from "nestjs-zod";
 import { AppModule } from "./app.module.js";
 import { configureApp } from "./app.setup.js";
-import { ACCESS_COOKIE } from "./auth/auth.types.js";
+import { ACCESS_COOKIE } from "./auth/types/auth.types.js";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);

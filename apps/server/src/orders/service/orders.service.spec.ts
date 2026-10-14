@@ -4,9 +4,9 @@ import {
 	UnprocessableEntityException,
 } from "@nestjs/common";
 import { firstValueFrom, toArray } from "rxjs";
-import { FakePrisma, FakeRedis } from "../../test/fakes.js";
-import type { PrismaService } from "../prisma/prisma.service.js";
-import type { RedisService } from "../redis/redis.service.js";
+import { FakePrisma, FakeRedis } from "../../../test/fakes.js";
+import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { RedisService } from "../../redis/service/redis.service.js";
 import { OrderEventsService } from "./order-events.service.js";
 import { OrdersService } from "./orders.service.js";
 

@@ -15,17 +15,17 @@ import {
 	switchMap,
 	takeWhile,
 } from "rxjs";
-import type { AuthUser } from "../auth/auth.types.js";
-import { PrismaService } from "../prisma/prisma.service.js";
-import type { CreateOrderDto } from "./order.dto.js";
-import { type OrderView, toOrderView } from "./order.view.js";
-import { OrderEventsService } from "./order-events.service.js";
+import type { AuthUser } from "../../auth/types/auth.types.js";
+import { PrismaService } from "../../prisma/service/prisma.service.js";
 import {
 	canTransition,
 	isFinalStatus,
 	nextStatus,
 	type OrderStatus,
-} from "./order-status.js";
+} from "../constant/order-status.js";
+import type { CreateOrderDto } from "../dto/order.dto.js";
+import { type OrderView, toOrderView } from "../dto/order.view.js";
+import { OrderEventsService } from "./order-events.service.js";
 
 const withItems = { items: true } as const;
 

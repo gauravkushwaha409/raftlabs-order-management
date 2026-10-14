@@ -5,9 +5,12 @@ import {
 	Injectable,
 	UnauthorizedException,
 } from "@nestjs/common";
-import { AuthService } from "./auth.service.js";
-import { ACCESS_COOKIE, type AuthenticatedRequest } from "./auth.types.js";
-import { readCookie } from "./cookies.js";
+import { AuthService } from "../service/auth.service.js";
+import {
+	ACCESS_COOKIE,
+	type AuthenticatedRequest,
+} from "../types/auth.types.js";
+import { readCookie } from "../util/cookies.js";
 
 /** Requires a valid session cookie and attaches the user as `request.user`. */
 @Injectable()

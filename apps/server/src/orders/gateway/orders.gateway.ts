@@ -5,11 +5,11 @@ import {
 	WebSocketServer,
 } from "@nestjs/websockets";
 import type { Namespace, Socket } from "socket.io";
-import { AuthService } from "../auth/auth.service.js";
-import { ACCESS_COOKIE } from "../auth/auth.types.js";
-import { readCookie } from "../auth/cookies.js";
-import { getCorsOrigins } from "../common/cors.js";
-import { OrderEventsService } from "./order-events.service.js";
+import { AuthService } from "../../auth/service/auth.service.js";
+import { ACCESS_COOKIE } from "../../auth/types/auth.types.js";
+import { readCookie } from "../../auth/util/cookies.js";
+import { getCorsOrigins } from "../../common/cors.js";
+import { OrderEventsService } from "../service/order-events.service.js";
 
 const ADMINS_ROOM = "admins";
 

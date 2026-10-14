@@ -11,14 +11,14 @@ import {
 	UseGuards,
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
-import { AdminGuard } from "../auth/auth.guard.js";
-import { ACCESS_COOKIE } from "../auth/auth.types.js";
-import { CreateMenuItemDto, UpdateMenuItemDto } from "./menu.dto.js";
+import { AdminGuard } from "../../auth/guard/auth.guard.js";
+import { ACCESS_COOKIE } from "../../auth/types/auth.types.js";
+import { CreateMenuItemDto, UpdateMenuItemDto } from "../dto/menu.dto.js";
 import {
 	type AdminMenuItemView,
 	type MenuItemView,
 	MenuService,
-} from "./menu.service.js";
+} from "../service/menu.service.js";
 
 @ApiTags("Menu")
 @Controller("menu")

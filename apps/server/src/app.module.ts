@@ -5,7 +5,7 @@ import { ZodValidationPipe } from "nestjs-zod";
 import { AuthModule } from "./auth/auth.module.js";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter.js";
 import { ResponseInterceptor } from "./common/interceptor/response.interceptor.js";
-import { HealthController } from "./health/health.controller.js";
+import { HealthController } from "./health/controller/health.controller.js";
 import { MenuModule } from "./menu/menu.module.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";

@@ -10,12 +10,12 @@ import {
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
-import { LoginDto, RegisterDto } from "./auth.dto.js";
-import { AuthGuard } from "./auth.guard.js";
-import { AuthService } from "./auth.service.js";
-import { ACCESS_COOKIE, type AuthUser } from "./auth.types.js";
-import { sessionCookieOptions } from "./cookies.js";
-import { CurrentUser } from "./current-user.decorator.js";
+import { CurrentUser } from "../decorator/current-user.decorator.js";
+import { LoginDto, RegisterDto } from "../dto/auth.dto.js";
+import { AuthGuard } from "../guard/auth.guard.js";
+import { AuthService } from "../service/auth.service.js";
+import { ACCESS_COOKIE, type AuthUser } from "../types/auth.types.js";
+import { sessionCookieOptions } from "../util/cookies.js";
 
 // Credential endpoints are brute-force targets: much stricter than the global limit.
 const CREDENTIAL_LIMIT = { default: { limit: 10, ttl: 60_000 } };

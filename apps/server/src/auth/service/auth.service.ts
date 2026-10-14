@@ -4,10 +4,10 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { PrismaService } from "../prisma/prisma.service.js";
-import type { LoginDto, RegisterDto } from "./auth.dto.js";
-import type { AuthUser } from "./auth.types.js";
-import { hashPassword, verifyPassword } from "./password.js";
+import { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { LoginDto, RegisterDto } from "../dto/auth.dto.js";
+import type { AuthUser } from "../types/auth.types.js";
+import { hashPassword, verifyPassword } from "../util/password.js";
 
 const toAuthUser = ({ id, email, name, role }: AuthUser): AuthUser => ({
 	id,

@@ -6,10 +6,9 @@ import {
 } from "@nestjs/common";
 import type { Redis } from "ioredis";
 import { type Observable, Subject } from "rxjs";
-import { RedisService } from "../redis/redis.service.js";
-import type { OrderView } from "./order.view.js";
-
-export const ORDER_EVENTS_CHANNEL = "orders:events";
+import { REDIS_CHANNELS } from "../../redis/constant/redis-keys.js";
+import { RedisService } from "../../redis/service/redis.service.js";
+import type { OrderView } from "../dto/order.view.js";
 
 export interface OrderEvent {
 	type: "created" | "updated" | "deleted";
@@ -39,7 +38,7 @@ export class OrderEventsService implements OnModuleInit, OnModuleDestroy {
 				this.logger.warn(`Dropped malformed order event: ${String(error)}`);
 			}
 		});
-		await this.subscriber.subscribe(ORDER_EVENTS_CHANNEL);
+		await this.subscriber.subscribe(REDIS_CHANNELS.ORDER_EVENTS);
 	}
 
 	async onModuleDestroy() {
@@ -50,7 +49,7 @@ export class OrderEventsService implements OnModuleInit, OnModuleDestroy {
 	/** Never throws: the DB write already succeeded, a lost notification must not fail the request. */
 	async publish(event: OrderEvent) {
 		try {
-			await this.redis.publish(ORDER_EVENTS_CHANNEL, JSON.stringify(event));
+			await this.redis.publish(REDIS_CHANNELS.ORDER_EVENTS, JSON.stringify(event));
 		} catch (error) {
 			this.logger.error(`Failed to publish order event: ${String(error)}`);
 		}

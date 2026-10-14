@@ -4,8 +4,8 @@ import {
 	type OnModuleDestroy,
 } from "@nestjs/common";
 import { Subscription } from "rxjs";
+import { isFinalStatus, type OrderStatus } from "../constant/order-status.js";
 import { OrderEventsService } from "./order-events.service.js";
-import { isFinalStatus, type OrderStatus } from "./order-status.js";
 import { OrdersService } from "./orders.service.js";
 
 const DEFAULT_STEP_MS = 10_000;

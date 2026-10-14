@@ -4,37 +4,24 @@ import {
 	Delete,
 	Get,
 	HttpCode,
-	type MessageEvent,
 	Param,
 	ParseUUIDPipe,
 	Patch,
 	Post,
 	Query,
-	Sse,
 	UseGuards,
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
-import {
-	interval,
-	last,
-	map,
-	merge,
-	type Observable,
-	share,
-	takeUntil,
-} from "rxjs";
-import { AdminGuard, AuthGuard } from "../auth/auth.guard.js";
-import { ACCESS_COOKIE, type AuthUser } from "../auth/auth.types.js";
-import { CurrentUser } from "../auth/current-user.decorator.js";
+import { CurrentUser } from "../../auth/decorator/current-user.decorator.js";
+import { AdminGuard, AuthGuard } from "../../auth/guard/auth.guard.js";
+import { ACCESS_COOKIE, type AuthUser } from "../../auth/types/auth.types.js";
 import {
 	CreateOrderDto,
 	ListOrdersQueryDto,
 	UpdateOrderStatusDto,
-} from "./order.dto.js";
-import type { OrderView } from "./order.view.js";
-import { OrdersService } from "./orders.service.js";
-
-const KEEP_ALIVE_MS = 25_000;
+} from "../dto/order.dto.js";
+import type { OrderView } from "../dto/order.view.js";
+import { OrdersService } from "../service/orders.service.js";
 
 @ApiTags("Orders")
 @ApiCookieAuth(ACCESS_COOKIE)
@@ -75,24 +62,6 @@ export class OrdersController {
 		@Param("id", ParseUUIDPipe) id: string,
 	): Promise<OrderView> {
 		return this.orders.getFor(user, id);
-	}
-
-	/** Server-Sent Events: `order` events carry the full order, `ping` keeps proxies from closing the stream. */
-	@Sse(":id/events")
-	@UseGuards(AuthGuard)
-	async events(
-		@CurrentUser() user: AuthUser,
-		@Param("id", ParseUUIDPipe) id: string,
-	): Promise<Observable<MessageEvent>> {
-		await this.orders.getFor(user, id); // 404 for strangers before the stream opens
-		const order$ = this.orders.watch(id).pipe(share());
-		return merge(
-			order$.pipe(map((order): MessageEvent => ({ type: "order", data: order }))),
-			interval(KEEP_ALIVE_MS).pipe(
-				takeUntil(order$.pipe(last(undefined, null))),
-				map((): MessageEvent => ({ type: "ping", data: "" })),
-			),
-		);
 	}
 
 	@Patch(":id/status")

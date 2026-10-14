@@ -4,9 +4,9 @@ import { io } from "socket.io-client";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { configureApp } from "../src/app.setup.js";
-import { hashPassword } from "../src/auth/password.js";
-import { PrismaService } from "../src/prisma/prisma.service.js";
-import { RedisService } from "../src/redis/redis.service.js";
+import { hashPassword } from "../src/auth/util/password.js";
+import { PrismaService } from "../src/prisma/service/prisma.service.js";
+import { RedisService } from "../src/redis/service/redis.service.js";
 import { FakePrisma, FakeRedis } from "./fakes.js";
 
 const ADMIN = { email: "admin@example.com", password: "admin-password-1" };

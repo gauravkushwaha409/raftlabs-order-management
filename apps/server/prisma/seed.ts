@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import * as dotenv from "dotenv";
-import { hashPassword } from "../src/auth/password.js";
+import { hashPassword } from "../src/auth/util/password.js";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 import { DEMO_ACCOUNTS, DEMO_ORDERS, MENU_SEED } from "./seed-data.js";
 

@@ -1,4 +1,4 @@
-import { OrderStatus } from "../generated/prisma/enums.js";
+import { OrderStatus } from "../../generated/prisma/enums.js";
 
 export { OrderStatus };
 

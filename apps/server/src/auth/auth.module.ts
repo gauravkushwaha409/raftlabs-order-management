@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
-import { AuthController } from "./auth.controller.js";
-import { AdminGuard, AuthGuard } from "./auth.guard.js";
-import { AuthService } from "./auth.service.js";
+import { AuthController } from "./controller/auth.controller.js";
+import { AdminGuard, AuthGuard } from "./guard/auth.guard.js";
+import { AuthService } from "./service/auth.service.js";
 
 function jwtSecret() {
 	const secret = process.env.JWT_SECRET;

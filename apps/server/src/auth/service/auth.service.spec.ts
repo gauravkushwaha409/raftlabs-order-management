@@ -1,9 +1,9 @@
 import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { FakePrisma } from "../../test/fakes.js";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import { FakePrisma } from "../../../test/fakes.js";
+import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import { verifyPassword } from "../util/password.js";
 import { AuthService } from "./auth.service.js";
-import { verifyPassword } from "./password.js";
 
 const SECRET = "unit-test-secret-unit-test-secret-1234";
 

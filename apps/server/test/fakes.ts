@@ -6,7 +6,7 @@ import type {
 	OrderItem,
 	User,
 } from "../src/generated/prisma/client.js";
-import type { OrderStatus } from "../src/orders/order-status.js";
+import type { OrderStatus } from "../src/orders/constant/order-status.js";
 
 type OrderRecord = Order & { items: OrderItem[] };
 type Where = {

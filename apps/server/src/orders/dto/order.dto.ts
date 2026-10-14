@@ -1,6 +1,6 @@
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { OrderStatus } from "./order-status.js";
+import { OrderStatus } from "../constant/order-status.js";
 
 const statusSchema = z.enum(
 	Object.values(OrderStatus) as [OrderStatus, ...OrderStatus[]],

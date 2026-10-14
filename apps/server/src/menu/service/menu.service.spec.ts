@@ -1,6 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
-import { FakePrisma } from "../../test/fakes.js";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import { FakePrisma } from "../../../test/fakes.js";
+import type { PrismaService } from "../../prisma/service/prisma.service.js";
 import { MenuService } from "./menu.service.js";
 
 const service = (prisma: FakePrisma) =>
