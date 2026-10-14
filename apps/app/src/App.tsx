@@ -1,9 +1,9 @@
+import { createQueryClient, TanstackQueryProvider } from "@package/query";
 import { Toaster } from "@package/ui";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
-const queryClient = new QueryClient();
+const queryClient = createQueryClient();
 const router = createRouter({ routeTree, context: { queryClient } });
 
 declare module "@tanstack/react-router" {
@@ -14,9 +14,9 @@ declare module "@tanstack/react-router" {
 
 export function App() {
 	return (
-		<QueryClientProvider client={queryClient}>
+		<TanstackQueryProvider client={queryClient}>
 			<Toaster position="bottom-right" duration={2500} />
 			<RouterProvider router={router} />
-		</QueryClientProvider>
+		</TanstackQueryProvider>
 	);
 }

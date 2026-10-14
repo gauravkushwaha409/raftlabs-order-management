@@ -84,6 +84,8 @@ services:
     volumes:
       - ../apps/app/src:/app/apps/app/src
       - ../packages/ui/src:/app/packages/ui/src
+      - ../packages/query/src:/app/packages/query/src
+      - ../packages/form/src:/app/packages/form/src
     depends_on:
       server:
         condition: service_healthy
@@ -104,6 +106,8 @@ services:
     volumes:
       - ../apps/admin/src:/app/apps/admin/src
       - ../packages/ui/src:/app/packages/ui/src
+      - ../packages/query/src:/app/packages/query/src
+      - ../packages/form/src:/app/packages/form/src
     depends_on:
       server:
         condition: service_healthy

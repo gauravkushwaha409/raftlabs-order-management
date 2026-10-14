@@ -7,7 +7,9 @@ Turborepo monorepo (pnpm 12, Node 24+).
 | `apps/server` | NestJS 12 API (`/api/v1`, Swagger at `/api/v1/docs`), Prisma 7 + Postgres, Redis, Zod validation |
 | `apps/app` | Customer app: React 19, Vite 8, TanStack Router/Query, Zustand, Tailwind 4 |
 | `apps/admin` | Admin app (same stack minus Zustand) |
-| `packages/ui` | shadcn-based design system + Tailwind theme (`@package/ui/global.css`) |
+| `packages/ui` | shadcn-based design system + Tailwind theme (`@package/ui/global.css`), lucide icons |
+| `packages/query` | TanStack Query client/provider (localStorage persistence) + `useQuery`/`useMutation` wrappers |
+| `packages/form` | react-hook-form + Zod wrappers (`FormInput`, `FormTextarea`, ...) |
 
 ## Setup
 

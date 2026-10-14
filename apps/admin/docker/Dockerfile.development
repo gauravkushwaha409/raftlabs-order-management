@@ -12,6 +12,8 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/app/package.json ./apps/app/
 COPY apps/admin/package.json ./apps/admin/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/query/package.json ./packages/query/
+COPY packages/form/package.json ./packages/form/
 
 RUN pnpm install --frozen-lockfile
 

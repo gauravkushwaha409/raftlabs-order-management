@@ -12,6 +12,8 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@package/form": "workspace:*",
+		"@package/query": "workspace:*",
 		"@package/ui": "workspace:*",
 		"@tanstack/react-query": "^5.104.2",
 		"@tanstack/react-router": "^1.170.44",
