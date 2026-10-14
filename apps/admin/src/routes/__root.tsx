@@ -2,7 +2,7 @@ import { Button } from "@package/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { ShieldCheckIcon } from "lucide-react";
-import { useAdminKey } from "@/features/auth/admin-key";
+import { useAdmin, useLogout } from "@/features/auth/session";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 	{
@@ -11,7 +11,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootLayout() {
-	const { adminKey, signOut } = useAdminKey();
+	const admin = useAdmin();
+	const logout = useLogout();
 
 	return (
 		<div className="min-h-screen bg-background-base">
@@ -21,12 +22,12 @@ function RootLayout() {
 						<ShieldCheckIcon className="text-primary-500" />
 						Raftlabs Admin
 					</h1>
-					{adminKey && (
+					{admin.data && (
 						<Button
 							variant="secondary"
 							size="sm"
 							className="w-auto"
-							onClick={signOut}
+							onClick={() => logout.mutate()}
 						>
 							Sign out
 						</Button>

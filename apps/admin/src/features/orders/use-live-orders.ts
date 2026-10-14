@@ -7,13 +7,13 @@ import type { Order, OrderEvent } from "@/types/api";
 
 export const ORDERS_QUERY_KEY = ["orders"];
 
-/** Keeps the cached order list in sync with the API's admin websocket (namespace /admin). */
-export function useLiveOrders(adminKey: string, onUnauthorized: () => void) {
+/** Keeps the cached order list in sync with the API's admin websocket (namespace /admin, session cookie). */
+export function useLiveOrders(onUnauthorized: () => void) {
 	const queryClient = useQueryClient();
 	const [connected, setConnected] = useState(false);
 
 	useEffect(() => {
-		const socket = io(`${SERVER_ORIGIN}/admin`, { auth: { key: adminKey } });
+		const socket = io(`${SERVER_ORIGIN}/admin`, { withCredentials: true });
 		socket.on("connect", () => setConnected(true));
 		socket.on("disconnect", () => setConnected(false));
 		socket.on("unauthorized", onUnauthorized);
@@ -25,7 +25,7 @@ export function useLiveOrders(adminKey: string, onUnauthorized: () => void) {
 		return () => {
 			socket.disconnect();
 		};
-	}, [adminKey, onUnauthorized, queryClient]);
+	}, [onUnauthorized, queryClient]);
 
 	return { connected };
 }

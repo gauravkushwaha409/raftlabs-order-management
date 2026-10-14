@@ -1,27 +1,32 @@
-import { useMutation } from "@package/query";
 import type { ReactNode } from "react";
-import { listOrders } from "@/lib/api";
-import { useAdminKey } from "./admin-key";
+import type { User } from "@/types/api";
 import { LoginForm } from "./login-form";
+import { useAdmin, useLogin } from "./session";
 
-/** Shows the children once an admin key is stored; otherwise verifies a typed key against the API first. */
+/** Renders the children for a signed-in admin and the sign-in form for everyone else. */
 export function AdminGate({
 	children,
 }: {
-	children: (adminKey: string) => ReactNode;
+	children: (admin: User) => ReactNode;
 }) {
-	const { adminKey, signIn } = useAdminKey();
-	const verify = useMutation((key: string) => listOrders(key).then(() => key), {
-		onSuccess: signIn,
-	});
+	const admin = useAdmin();
+	const login = useLogin();
 
-	if (adminKey) return <>{children(adminKey)}</>;
+	if (admin.isPending)
+		return (
+			<div
+				role="status"
+				aria-label="Loading"
+				className="h-48 animate-pulse rounded-xl bg-gray-100"
+			/>
+		);
+	if (admin.data) return <>{children(admin.data)}</>;
 
 	return (
 		<LoginForm
-			isPending={verify.isPending}
-			error={verify.error?.message ?? null}
-			onSubmit={(key) => verify.mutate(key)}
+			isPending={login.isPending}
+			error={login.error?.message ?? null}
+			onSubmit={(values) => login.mutate(values)}
 		/>
 	);
 }

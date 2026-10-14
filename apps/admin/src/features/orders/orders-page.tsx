@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@package/query";
 import { Button } from "@package/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useAdminKey } from "@/features/auth/admin-key";
+import { useLogout } from "@/features/auth/session";
 import {
 	ApiError,
 	deleteOrder,
@@ -20,37 +20,38 @@ import { STATUS_LABEL } from "./order-status";
 import { OrdersTable } from "./orders-table";
 import { ORDERS_QUERY_KEY, useLiveOrders } from "./use-live-orders";
 
-export function OrdersPage({ adminKey }: { adminKey: string }) {
-	const { signOut } = useAdminKey();
+export function OrdersPage() {
+	const { mutate: signOut } = useLogout();
 	const queryClient = useQueryClient();
 	const [filter, setFilter] = useState<OrderStatus | "ALL">("ALL");
-	const { connected } = useLiveOrders(adminKey, signOut);
+	const { connected } = useLiveOrders(signOut);
 
 	const signOutIfUnauthorized = (error: Error | null) => {
-		if (error instanceof ApiError && error.status === 401) signOut();
+		if (
+			error instanceof ApiError &&
+			(error.status === 401 || error.status === 403)
+		)
+			signOut();
 	};
 	const applyToCache = (event: OrderEvent) =>
 		queryClient.setQueryData<Order[]>(ORDERS_QUERY_KEY, (orders) =>
 			orders ? applyOrderEvent(orders, event) : orders,
 		);
 
-	const orders = useQuery(
-		ORDERS_QUERY_KEY,
-		() => listOrders(adminKey),
-		undefined,
-		{ refetchOnMount: "always" },
-	);
+	const orders = useQuery(ORDERS_QUERY_KEY, listOrders, undefined, {
+		refetchOnMount: "always",
+	});
 	useEffect(() => signOutIfUnauthorized(orders.error));
 
 	const change = useMutation(
 		({ order, status }: { order: Order; status: OrderStatus }) =>
-			updateOrderStatus(adminKey, order.id, status),
+			updateOrderStatus(order.id, status),
 		{
 			onSuccess: (order) => applyToCache({ type: "updated", order }),
 			onError: signOutIfUnauthorized,
 		},
 	);
-	const remove = useMutation((order: Order) => deleteOrder(adminKey, order.id), {
+	const remove = useMutation((order: Order) => deleteOrder(order.id), {
 		onSuccess: (_, order) => applyToCache({ type: "deleted", order }),
 		onError: signOutIfUnauthorized,
 	});

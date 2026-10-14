@@ -3,7 +3,5 @@ import { AdminGate } from "@/features/auth/admin-gate";
 import { OrdersPage } from "@/features/orders/orders-page";
 
 export const Route = createFileRoute("/")({
-	component: () => (
-		<AdminGate>{(adminKey) => <OrdersPage adminKey={adminKey} />}</AdminGate>
-	),
+	component: () => <AdminGate>{() => <OrdersPage />}</AdminGate>,
 });

@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from "@/types/api";
+import type { Order, OrderStatus, User } from "@/types/api";
 
 // Dev/docker: same-origin via the Vite proxy. Hosted: absolute URL baked in at build time.
 export const SERVER_ORIGIN = __PROXY_ENABLED__
@@ -16,18 +16,11 @@ export class ApiError extends Error {
 	}
 }
 
-async function request<T>(
-	adminKey: string,
-	path: string,
-	init?: RequestInit,
-): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(`${API_BASE}${path}`, {
+		credentials: "include", // the session lives in an httpOnly cookie
 		...init,
-		headers: {
-			"content-type": "application/json",
-			"x-admin-key": adminKey,
-			...init?.headers,
-		},
+		headers: { "content-type": "application/json", ...init?.headers },
 	});
 	if (!response.ok) {
 		const body = (await response.json().catch(() => null)) as {
@@ -44,16 +37,22 @@ async function request<T>(
 		: (response.json() as Promise<T>);
 }
 
-export const listOrders = (adminKey: string) =>
-	request<Order[]>(adminKey, "/orders?limit=100");
-export const updateOrderStatus = (
-	adminKey: string,
-	id: string,
-	status: OrderStatus,
-) =>
-	request<Order>(adminKey, `/orders/${id}/status`, {
+export const login = (input: { email: string; password: string }) =>
+	request<User>("/auth/login", { method: "POST", body: JSON.stringify(input) });
+export const logout = () => request<void>("/auth/logout", { method: "POST" });
+
+/** The signed-in user, or null for visitors. */
+export const getMe = () =>
+	request<User>("/auth/me").catch((error: unknown) => {
+		if (error instanceof ApiError && error.status === 401) return null;
+		throw error;
+	});
+
+export const listOrders = () => request<Order[]>("/orders?limit=100");
+export const updateOrderStatus = (id: string, status: OrderStatus) =>
+	request<Order>(`/orders/${id}/status`, {
 		method: "PATCH",
 		body: JSON.stringify({ status }),
 	});
-export const deleteOrder = (adminKey: string, id: string) =>
-	request<void>(adminKey, `/orders/${id}`, { method: "DELETE" });
+export const deleteOrder = (id: string) =>
+	request<void>(`/orders/${id}`, { method: "DELETE" });

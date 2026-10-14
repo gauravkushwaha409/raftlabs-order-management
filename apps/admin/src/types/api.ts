@@ -30,3 +30,10 @@ export interface OrderEvent {
 	type: "created" | "updated" | "deleted";
 	order: Order;
 }
+
+export interface User {
+	id: string;
+	email: string;
+	name: string;
+	role: "CUSTOMER" | "ADMIN";
+}
