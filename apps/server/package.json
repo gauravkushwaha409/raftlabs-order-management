@@ -7,7 +7,9 @@
 	"scripts": {
 		"build": "rm -rf dist && tsc -p tsconfig.build.json",
 		"dev": "tsc -p tsconfig.build.json && concurrently -k -n tsc,node \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch dist/main.js\"",
+		"dev:worker": "tsc -p tsconfig.build.json && concurrently -k -n tsc,node \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch dist/worker.js\"",
 		"start": "node dist/main.js",
+		"start:worker": "node dist/worker.js",
 		"check-types": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
