@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
-import { KafkaConsumerService } from "./kafka-consumer.service.js";
-import { KafkaProducerService } from "./kafka-producer.service.js";
-import { KafkaTopicsService } from "./kafka-topics.service.js";
+import { KafkaConsumerService } from "./service/kafka-consumer.service.js";
+import { KafkaProducerService } from "./service/kafka-producer.service.js";
+import { KafkaTopicsService } from "./service/kafka-topics.service.js";
 
 /** Imported by the worker only: the API process never talks to Kafka (it writes to the outbox instead). */
 @Global()

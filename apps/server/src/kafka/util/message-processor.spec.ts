@@ -1,4 +1,7 @@
-import { type ConsumedMessage, PoisonMessageError } from "./kafka.types.js";
+import {
+	type ConsumedMessage,
+	PoisonMessageError,
+} from "../types/kafka.types.js";
 import { processMessage } from "./message-processor.js";
 
 const message: ConsumedMessage = {

@@ -1,4 +1,4 @@
-import type { OrderDomainEvent } from "../events/order-events.js";
+import type { OrderDomainEvent } from "../../events/order-events.js";
 
 export interface NotificationCopy {
 	title: string;

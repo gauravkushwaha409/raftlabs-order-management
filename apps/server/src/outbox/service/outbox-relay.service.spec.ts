@@ -1,7 +1,7 @@
-import { FakeKafka } from "../../test/fake-kafka.js";
-import { FakePrisma } from "../../test/fakes.js";
-import { ORDER_EVENTS_TOPIC } from "../events/order-events.js";
-import type { PrismaService } from "../prisma/prisma.service.js";
+import { FakeKafka } from "../../../test/fake-kafka.js";
+import { FakePrisma } from "../../../test/fakes.js";
+import { ORDER_EVENTS_TOPIC } from "../../events/order-events.js";
+import type { PrismaService } from "../../prisma/service/prisma.service.js";
 import { OutboxRelayService } from "./outbox-relay.service.js";
 
 function setup() {
@@ -63,7 +63,7 @@ describe("OutboxRelayService", () => {
 	it("stays idle when another relay holds the lock", async () => {
 		const { prisma, kafka, relay, enqueue } = setup();
 		await enqueue("e1", "order-a");
-		prisma.$queryRaw = async () => [{ locked: false }];
+		prisma.advisoryLockGranted = false;
 
 		await expect(relay.relayBatch()).resolves.toBe(0);
 		expect(kafka.messages).toHaveLength(0);

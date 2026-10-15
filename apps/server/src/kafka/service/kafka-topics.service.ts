@@ -1,7 +1,7 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { Admin } from "@platformatic/kafka";
-import { getKafkaConfig } from "./kafka.config.js";
-import { TOPICS } from "./topics.js";
+import { TOPICS } from "../constant/topics.js";
+import { getKafkaConfig } from "../util/kafka.config.js";
 
 /** Creates missing topics at startup (idempotent) so a fresh environment works without manual setup. */
 @Injectable()

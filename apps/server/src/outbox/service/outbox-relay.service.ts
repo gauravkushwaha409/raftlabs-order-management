@@ -5,9 +5,9 @@ import {
 	type OnApplicationBootstrap,
 	type OnModuleDestroy,
 } from "@nestjs/common";
-import { ORDER_EVENTS_TOPIC } from "../events/order-events.js";
-import { KafkaProducerService } from "../kafka/kafka-producer.service.js";
-import { PrismaService } from "../prisma/prisma.service.js";
+import { ORDER_EVENTS_TOPIC } from "../../events/order-events.js";
+import { KafkaProducerService } from "../../kafka/service/kafka-producer.service.js";
+import { PrismaService } from "../../prisma/service/prisma.service.js";
 
 const BATCH_SIZE = 100;
 const IDLE_MS = 500;

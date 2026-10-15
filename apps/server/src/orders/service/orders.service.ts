@@ -16,18 +16,21 @@ import {
 	takeWhile,
 } from "rxjs";
 import type { AuthUser } from "../../auth/types/auth.types.js";
-import { REDIS_KEYS, REDIS_TTL_SECONDS } from "../../common/constant/redis-keys.js";
-import { ROLES } from "../../common/constant/roles.js";
-import { orderPlaced, orderStatusChanged } from "../../events/order-events.js";
-import { enqueueOrderEvent } from "../../events/outbox.js";
-import { PrismaService } from "../../prisma/service/prisma.service.js";
-import { RedisService } from "../../redis/service/redis.service.js";
 import {
 	canTransition,
 	isFinalStatus,
 	nextStatus,
 	type OrderStatus,
 } from "../../common/constant/order-status.js";
+import {
+	REDIS_KEYS,
+	REDIS_TTL_SECONDS,
+} from "../../common/constant/redis-keys.js";
+import { ROLES } from "../../common/constant/roles.js";
+import { orderPlaced, orderStatusChanged } from "../../events/order-events.js";
+import { enqueueOrderEvent } from "../../events/outbox.js";
+import { PrismaService } from "../../prisma/service/prisma.service.js";
+import { RedisService } from "../../redis/service/redis.service.js";
 import type { CreateOrderDto } from "../dto/order.dto.js";
 import { type OrderView, toOrderView } from "../dto/order.view.js";
 import { OrderEventsService } from "./order-events.service.js";
@@ -142,12 +145,20 @@ export class OrdersService {
 		});
 		if (!row) return null;
 		const entry: CachedOrder = { view: toOrderView(row), userId: row.userId };
+		await this.cacheOrder(id, entry);
+		return entry;
+	}
+
+	private async cacheOrder(id: string, entry: CachedOrder): Promise<void> {
 		try {
-			await this.redis.setJson(key, entry, REDIS_TTL_SECONDS.ORDER_DETAIL);
+			await this.redis.setJson(
+				REDIS_KEYS.ORDER_DETAIL(id),
+				entry,
+				REDIS_TTL_SECONDS.ORDER_DETAIL,
+			);
 		} catch {
 			// Best-effort.
 		}
-		return entry;
 	}
 
 	/**
@@ -241,8 +252,8 @@ export class OrdersService {
 			return updated;
 		});
 		if (!order) return null;
-		await this.invalidateOrder(id);
 		const view = toOrderView(order);
+		await this.cacheOrder(id, { view, userId: order.userId }); // replaces the stale entry
 		await this.events.publish({ type: "updated", order: view });
 		return view;
 	}

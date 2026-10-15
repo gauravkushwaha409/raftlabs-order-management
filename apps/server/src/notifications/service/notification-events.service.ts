@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { RedisChannel } from "../redis/redis-channel.js";
-import type { NotificationView } from "./notification.view.js";
+import { RedisChannel } from "../../redis/redis-channel.js";
+import type { NotificationView } from "../dto/notification.view.js";
 
 export interface NotificationEvent {
 	userId: string;

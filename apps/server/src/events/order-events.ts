@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { Order } from "../generated/prisma/client.js";
 import { OrderStatus } from "../common/constant/order-status.js";
+import type { Order } from "../generated/prisma/client.js";
 
 /**
  * Contract of the order domain events on Kafka. The `.v1` topic suffix and the envelope `version`

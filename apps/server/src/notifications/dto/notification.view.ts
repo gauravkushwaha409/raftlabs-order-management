@@ -1,4 +1,4 @@
-import type { Notification } from "../generated/prisma/client.js";
+import type { Notification } from "../../generated/prisma/client.js";
 
 /** Wire format: plain JSON so it survives Redis pub/sub and SSE unchanged. */
 export interface NotificationView {

@@ -7,13 +7,13 @@ import {
 	isKnownOrderEventType,
 	ORDER_EVENTS_TOPIC,
 	orderEventSchema,
-} from "../events/order-events.js";
+} from "../../events/order-events.js";
+import { KafkaConsumerService } from "../../kafka/service/kafka-consumer.service.js";
 import {
 	type ConsumedMessage,
 	PoisonMessageError,
-} from "../kafka/kafka.types.js";
-import { KafkaConsumerService } from "../kafka/kafka-consumer.service.js";
-import { NotificationsService } from "./notifications.service.js";
+} from "../../kafka/types/kafka.types.js";
+import { NotificationsService } from "../service/notifications.service.js";
 
 export const NOTIFICATIONS_GROUP = "notifications";
 

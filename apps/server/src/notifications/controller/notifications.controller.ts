@@ -12,11 +12,11 @@ import {
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { filter, interval, map, merge, type Observable } from "rxjs";
-import { AuthGuard } from "../auth/auth.guard.js";
-import { ACCESS_COOKIE, type AuthUser } from "../auth/auth.types.js";
-import { CurrentUser } from "../auth/current-user.decorator.js";
-import { NotificationEventsService } from "./notification-events.service.js";
-import { NotificationsService } from "./notifications.service.js";
+import { CurrentUser } from "../../auth/decorator/current-user.decorator.js";
+import { AuthGuard } from "../../auth/guard/auth.guard.js";
+import { ACCESS_COOKIE, type AuthUser } from "../../auth/types/auth.types.js";
+import { NotificationEventsService } from "../service/notification-events.service.js";
+import { NotificationsService } from "../service/notifications.service.js";
 
 const KEEP_ALIVE_MS = 25_000;
 

@@ -5,9 +5,9 @@ import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { configureApp } from "../src/app.setup.js";
 import { hashPassword } from "../src/auth/util/password.js";
-import { KafkaConsumerService } from "../src/kafka/kafka-consumer.service.js";
-import { KafkaProducerService } from "../src/kafka/kafka-producer.service.js";
-import { KafkaTopicsService } from "../src/kafka/kafka-topics.service.js";
+import { KafkaConsumerService } from "../src/kafka/service/kafka-consumer.service.js";
+import { KafkaProducerService } from "../src/kafka/service/kafka-producer.service.js";
+import { KafkaTopicsService } from "../src/kafka/service/kafka-topics.service.js";
 import { PrismaService } from "../src/prisma/service/prisma.service.js";
 import { RedisService } from "../src/redis/service/redis.service.js";
 import { WorkerModule } from "../src/worker.module.js";
@@ -575,7 +575,9 @@ describe("API (e2e)", () => {
 				.get("/api/v1/notifications")
 				.set("Cookie", cookie)
 				.expect(200);
-			return (body.data.items as Array<{ title: string }>).map((item) => item.title);
+			return (body.data.items as Array<{ title: string }>).map(
+				(item) => item.title,
+			);
 		};
 		const waitForTitles = (cookie: string, expected: string[]) =>
 			vi.waitFor(async () => expect(await titles(cookie)).toEqual(expected), {

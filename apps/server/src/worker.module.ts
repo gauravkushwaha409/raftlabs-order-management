@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 import { KafkaModule } from "./kafka/kafka.module.js";
-import { NotificationsConsumer } from "./notifications/notifications.consumer.js";
+import { NotificationsConsumer } from "./notifications/consumer/notifications.consumer.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
-import { OutboxRelayService } from "./outbox/outbox-relay.service.js";
+import { OutboxRelayService } from "./outbox/service/outbox-relay.service.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { RedisModule } from "./redis/redis.module.js";
 

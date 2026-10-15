@@ -1,12 +1,12 @@
+import { deadLetterTopic } from "../src/kafka/constant/topics.js";
+import type { KafkaConsumerService } from "../src/kafka/service/kafka-consumer.service.js";
+import type { KafkaProducerService } from "../src/kafka/service/kafka-producer.service.js";
 import type {
 	ConsumedMessage,
 	MessageHandler,
 	ProducedMessage,
-} from "../src/kafka/kafka.types.js";
-import type { KafkaConsumerService } from "../src/kafka/kafka-consumer.service.js";
-import type { KafkaProducerService } from "../src/kafka/kafka-producer.service.js";
-import { processMessage } from "../src/kafka/message-processor.js";
-import { deadLetterTopic } from "../src/kafka/topics.js";
+} from "../src/kafka/types/kafka.types.js";
+import { processMessage } from "../src/kafka/util/message-processor.js";
 
 /**
  * In-memory broker: `send` delivers to every subscribed group before resolving, through the real

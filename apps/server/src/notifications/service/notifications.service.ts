@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { OrderDomainEvent } from "../events/order-events.js";
-import { PrismaService } from "../prisma/prisma.service.js";
+import type { OrderDomainEvent } from "../../events/order-events.js";
+import { PrismaService } from "../../prisma/service/prisma.service.js";
 import {
 	type NotificationView,
 	toNotificationView,
-} from "./notification.view.js";
+} from "../dto/notification.view.js";
 import { NotificationEventsService } from "./notification-events.service.js";
 import { describeEvent } from "./notification-templates.js";
 

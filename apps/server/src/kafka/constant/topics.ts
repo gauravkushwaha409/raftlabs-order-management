@@ -1,4 +1,4 @@
-import { ORDER_EVENTS_TOPIC } from "../events/order-events.js";
+import { ORDER_EVENTS_TOPIC } from "../../events/order-events.js";
 
 export const deadLetterTopic = (topic: string) => `${topic}.dlq`;
 

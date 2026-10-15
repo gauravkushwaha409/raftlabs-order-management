@@ -1,7 +1,7 @@
-import { orderPlaced } from "../events/order-events.js";
-import { PoisonMessageError } from "../kafka/kafka.types.js";
+import { orderPlaced } from "../../events/order-events.js";
+import { PoisonMessageError } from "../../kafka/types/kafka.types.js";
+import type { NotificationsService } from "../service/notifications.service.js";
 import { NotificationsConsumer } from "./notifications.consumer.js";
-import type { NotificationsService } from "./notifications.service.js";
 
 const message = (value: string) => ({
 	topic: "orders.events.v1",

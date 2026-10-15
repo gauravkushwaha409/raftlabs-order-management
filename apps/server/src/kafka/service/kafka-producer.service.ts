@@ -1,7 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { ProduceAcks, Producer, stringSerializers } from "@platformatic/kafka";
-import { getKafkaConfig } from "./kafka.config.js";
-import type { ProducedMessage } from "./kafka.types.js";
+import type { ProducedMessage } from "../types/kafka.types.js";
+import { getKafkaConfig } from "../util/kafka.config.js";
 
 /** Idempotent, acks=all producer: a retried send never duplicates or loses a message within a session. */
 @Injectable()

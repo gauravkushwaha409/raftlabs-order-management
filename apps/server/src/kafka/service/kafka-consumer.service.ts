@@ -6,11 +6,11 @@ import {
 	MessagesStreamModes,
 	stringDeserializers,
 } from "@platformatic/kafka";
-import { getKafkaConfig } from "./kafka.config.js";
-import type { ConsumedMessage, MessageHandler } from "./kafka.types.js";
+import { deadLetterTopic } from "../constant/topics.js";
+import type { ConsumedMessage, MessageHandler } from "../types/kafka.types.js";
+import { getKafkaConfig } from "../util/kafka.config.js";
+import { processMessage } from "../util/message-processor.js";
 import { KafkaProducerService } from "./kafka-producer.service.js";
-import { processMessage } from "./message-processor.js";
-import { deadLetterTopic } from "./topics.js";
 
 export interface Subscription {
 	/** Instances sharing a group id split the topic's partitions between them. */

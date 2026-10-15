@@ -1,12 +1,12 @@
 import { NotFoundException } from "@nestjs/common";
-import { FakePrisma, FakeRedis } from "../../test/fakes.js";
+import { FakePrisma, FakeRedis } from "../../../test/fakes.js";
 import {
 	type OrderDomainEvent,
 	orderPlaced,
 	orderStatusChanged,
-} from "../events/order-events.js";
-import type { PrismaService } from "../prisma/prisma.service.js";
-import type { RedisService } from "../redis/redis.service.js";
+} from "../../events/order-events.js";
+import type { PrismaService } from "../../prisma/service/prisma.service.js";
+import type { RedisService } from "../../redis/service/redis.service.js";
 import { NotificationEventsService } from "./notification-events.service.js";
 import { NotificationsService } from "./notifications.service.js";
 

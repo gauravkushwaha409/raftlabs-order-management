@@ -3,7 +3,7 @@ import {
 	type ConsumedMessage,
 	type MessageHandler,
 	PoisonMessageError,
-} from "./kafka.types.js";
+} from "../types/kafka.types.js";
 
 export interface RetryPolicy {
 	maxAttempts: number;
