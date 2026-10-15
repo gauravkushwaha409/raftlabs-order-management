@@ -19,3 +19,7 @@ apiClient.interceptors.response.use(
 /** Absolute URL of an order's Server-Sent Events stream. */
 export const orderEventsUrl = (orderId: string) =>
 	`${SERVER_ORIGIN}/api/v1${ENDPOINTS.ORDERS.EVENTS(orderId)}`;
+
+/** Absolute URL of the signed-in user's notification stream (Server-Sent Events). */
+export const notificationsStreamUrl = () =>
+	`${SERVER_ORIGIN}/api/v1${ENDPOINTS.NOTIFICATIONS.STREAM}`;
