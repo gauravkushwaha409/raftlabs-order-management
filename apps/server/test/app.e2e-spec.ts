@@ -5,8 +5,13 @@ import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { configureApp } from "../src/app.setup.js";
 import { hashPassword } from "../src/auth/util/password.js";
+import { KafkaConsumerService } from "../src/kafka/kafka-consumer.service.js";
+import { KafkaProducerService } from "../src/kafka/kafka-producer.service.js";
+import { KafkaTopicsService } from "../src/kafka/kafka-topics.service.js";
 import { PrismaService } from "../src/prisma/service/prisma.service.js";
 import { RedisService } from "../src/redis/service/redis.service.js";
+import { WorkerModule } from "../src/worker.module.js";
+import { FakeKafka } from "./fake-kafka.js";
 import { FakePrisma, FakeRedis } from "./fakes.js";
 
 const ADMIN = { email: "admin@example.com", password: "admin-password-1" };
@@ -20,6 +25,7 @@ const UNKNOWN_ID = "6b0c2d8e-0000-4000-8000-000000000000";
 describe("API (e2e)", () => {
 	let app: INestApplication;
 	let prisma: FakePrisma;
+	let kafka: FakeKafka;
 	let pizzaId: string;
 	let http: ReturnType<typeof request>;
 	let baseUrl: string;
@@ -39,7 +45,17 @@ describe("API (e2e)", () => {
 		pizzaId = prisma.addMenuItem({ name: "Pizza", priceCents: 1000 }).id;
 		prisma.addMenuItem({ name: "Burger", priceCents: 900, category: "Burgers" });
 
-		const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+		kafka = new FakeKafka();
+		// API and worker run side by side here; only the Kafka client and topic admin are faked.
+		const moduleRef = await Test.createTestingModule({
+			imports: [AppModule, WorkerModule],
+		})
+			.overrideProvider(KafkaProducerService)
+			.useValue(kafka.producer)
+			.overrideProvider(KafkaConsumerService)
+			.useValue(kafka.consumer)
+			.overrideProvider(KafkaTopicsService)
+			.useValue({})
 			.overrideProvider(PrismaService)
 			.useValue(prisma)
 			.overrideProvider(RedisService)
@@ -550,6 +566,122 @@ describe("API (e2e)", () => {
 			const unauthorized = once(socket, "unauthorized");
 			const disconnected = once(socket, "disconnect");
 			await Promise.all([unauthorized, disconnected]);
+		});
+	});
+
+	describe("notifications (order -> outbox -> Kafka -> notification)", () => {
+		const titles = async (cookie: string) => {
+			const { body } = await http
+				.get("/api/v1/notifications")
+				.set("Cookie", cookie)
+				.expect(200);
+			return (body.data.items as Array<{ title: string }>).map((item) => item.title);
+		};
+		const waitForTitles = (cookie: string, expected: string[]) =>
+			vi.waitFor(async () => expect(await titles(cookie)).toEqual(expected), {
+				timeout: 4000,
+				interval: 50,
+			});
+
+		it("requires a session", async () => {
+			await http.get("/api/v1/notifications").expect(401);
+			await http.get("/api/v1/notifications/stream").expect(401);
+			await http.post("/api/v1/notifications/read-all").expect(401);
+		});
+
+		it("tells the customer their order was received, and nobody else", async () => {
+			const customerA = await signUp();
+			const customerB = await signUp();
+			await placeOrder(customerA.cookie).expect(201);
+
+			await waitForTitles(customerA.cookie, ["Order received"]);
+			expect(await titles(customerB.cookie)).toEqual([]);
+			expect(kafka.topic("orders.events.v1.dlq")).toHaveLength(0);
+		});
+
+		it("notifies on each status change, newest first", async () => {
+			const customer = await signUp();
+			const adminCookie = await signInAdmin();
+			const { body: placed } = await placeOrder(customer.cookie).expect(201);
+			const order = placed.data as { id: string };
+			await http
+				.patch(`/api/v1/orders/${order.id}/status`)
+				.set("Cookie", adminCookie)
+				.send({ status: "PREPARING" })
+				.expect(200);
+
+			await waitForTitles(customer.cookie, [
+				"Preparing your order",
+				"Order received",
+			]);
+		});
+
+		it("marks notifications read one by one and all at once", async () => {
+			const customer = await signUp();
+			const stranger = await signUp();
+			await placeOrder(customer.cookie).expect(201);
+			await waitForTitles(customer.cookie, ["Order received"]);
+			const { body } = await http
+				.get("/api/v1/notifications")
+				.set("Cookie", customer.cookie)
+				.expect(200);
+			expect(body.data.unreadCount).toBe(1);
+			const id = body.data.items[0].id as string;
+
+			await http
+				.patch(`/api/v1/notifications/${id}/read`)
+				.set("Cookie", stranger.cookie)
+				.expect(404);
+			await http
+				.patch(`/api/v1/notifications/${id}/read`)
+				.set("Cookie", customer.cookie)
+				.expect(204);
+			await http
+				.post("/api/v1/notifications/read-all")
+				.set("Cookie", customer.cookie)
+				.expect(204);
+
+			const after = await http
+				.get("/api/v1/notifications")
+				.set("Cookie", customer.cookie)
+				.expect(200);
+			expect(after.body.data.unreadCount).toBe(0);
+			expect(after.body.data.items[0].read).toBe(true);
+		});
+
+		it("pushes new notifications over SSE to the owner only", async () => {
+			const customer = await signUp();
+			const response = await fetch(`${baseUrl}/api/v1/notifications/stream`, {
+				headers: { cookie: customer.cookie },
+			});
+			expect(response.headers.get("content-type")).toContain("text/event-stream");
+			const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+			const decoder = new TextDecoder();
+			let received = "";
+			const readUntil = async (marker: string) => {
+				while (!received.includes(marker)) {
+					const { value, done } = await reader.read();
+					if (done) break;
+					received += decoder.decode(value);
+				}
+			};
+
+			await placeOrder(customer.cookie).expect(201);
+			await readUntil("Order received");
+			await reader.cancel();
+
+			expect(received).toContain("event: notification");
+		});
+
+		it("dead-letters a malformed event without blocking the next one", async () => {
+			const customer = await signUp();
+			await kafka.producer.send([
+				{ topic: "orders.events.v1", key: "bad", value: "{not json" },
+			]);
+			await placeOrder(customer.cookie).expect(201);
+
+			await waitForTitles(customer.cookie, ["Order received"]);
+			expect(kafka.topic("orders.events.v1.dlq")).toHaveLength(1);
 		});
 	});
 });
