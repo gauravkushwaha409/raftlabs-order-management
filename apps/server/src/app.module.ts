@@ -7,6 +7,7 @@ import { HttpExceptionFilter } from "./common/filters/http-exception.filter.js";
 import { ResponseInterceptor } from "./common/interceptor/response.interceptor.js";
 import { HealthController } from "./health/controller/health.controller.js";
 import { MenuModule } from "./menu/menu.module.js";
+import { NotificationsApiModule } from "./notifications/notifications-api.module.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { RedisModule } from "./redis/redis.module.js";
@@ -23,6 +24,7 @@ import { RedisModule } from "./redis/redis.module.js";
 		AuthModule,
 		MenuModule,
 		OrdersModule,
+		NotificationsApiModule,
 	],
 	controllers: [HealthController],
 	providers: [
