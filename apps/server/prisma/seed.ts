@@ -6,17 +6,15 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 import { DEMO_ACCOUNTS, DEMO_ORDERS, MENU_SEED } from "./seed-data.js";
 
 // SEED_MODE is the single knob: it selects WHICH database (env/.env.<mode>) and WHAT gets seeded. APP_ENV is
-// still honored as a fallback for the env file so `APP_ENV=staging pnpm prisma:seed` keeps working.
+// still honored as a fallback for the env file.
 //   development → menu + demo admin + demo customer + a few past orders
-//   staging     → menu + demo admin + demo customer (no demo orders)
 //   production  → refuses unless ALLOW_PRODUCTION_SEED=true; then seeds the menu plus only the accounts whose
 //                 ADMIN_* / CUSTOMER_* credentials are set in env (never the well-known demo passwords)
-type SeedMode = "development" | "staging" | "production";
+type SeedMode = "development" | "production";
 type Role = "ADMIN" | "CUSTOMER";
 
 function parseSeedMode(raw: string | undefined): SeedMode {
 	const value = (raw ?? "development").toLowerCase();
-	if (value === "staging" || value === "stg") return "staging";
 	if (value === "production" || value === "prod") return "production";
 	return "development";
 }

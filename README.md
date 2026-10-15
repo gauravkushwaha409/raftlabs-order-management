@@ -36,7 +36,6 @@ Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`.
 | Mode | Command | Seeds |
 | --- | --- | --- |
 | development (default) | `pnpm prisma:development:seed` | menu, both accounts, 2 past orders for the customer |
-| staging | `pnpm prisma:staging:seed` | menu, both accounts |
 | production | `ALLOW_PRODUCTION_SEED=true pnpm prisma:production:seed` | menu, plus only the accounts whose `ADMIN_*` / `CUSTOMER_*` email **and** password are set. Refuses without the flag and never uses the demo passwords |
 
 Override credentials with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / `CUSTOMER_PASSWORD`. `pnpm prisma:reset:hard` resets the DB, migrates and seeds. Seeding skips an email that already exists, so a database that already holds `admin@example.com` keeps its old password.
