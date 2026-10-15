@@ -135,6 +135,7 @@ export class FakePrisma {
 		}) =>
 			this.notifications
 				.filter((row) => row.userId === where.userId)
+				.reverse() // newest insert first, so equal timestamps still sort newest-first
 				.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 				.slice(0, take),
 		count: async ({ where }: { where: { userId: string; readAt: null } }) =>
@@ -145,13 +146,13 @@ export class FakePrisma {
 			where,
 			data,
 		}: {
-			where: { userId: string; id?: string; readAt: null };
+			where: { userId: string; id?: string; readAt?: null };
 			data: { readAt: Date };
 		}) => {
 			const targets = this.notifications.filter(
 				(row) =>
 					row.userId === where.userId &&
-					row.readAt === null &&
+					(where.readAt === undefined || row.readAt === null) &&
 					(where.id === undefined || row.id === where.id),
 			);
 			for (const row of targets) row.readAt = data.readAt;
