@@ -15,13 +15,12 @@ import {
 	switchMap,
 	takeWhile,
 } from "rxjs";
-import { ROLES } from "../../common/constant/roles.js";
 import type { AuthUser } from "../../auth/types/auth.types.js";
+import { REDIS_KEYS, REDIS_TTL_SECONDS } from "../../common/constant/redis-keys.js";
+import { ROLES } from "../../common/constant/roles.js";
+import { orderPlaced, orderStatusChanged } from "../../events/order-events.js";
+import { enqueueOrderEvent } from "../../events/outbox.js";
 import { PrismaService } from "../../prisma/service/prisma.service.js";
-import {
-	REDIS_KEYS,
-	REDIS_TTL_SECONDS,
-} from "../../common/constant/redis-keys.js";
 import { RedisService } from "../../redis/service/redis.service.js";
 import {
 	canTransition,
@@ -74,19 +73,24 @@ export class OrdersService {
 			};
 		});
 
-		const order = await this.prisma.order.create({
-			data: {
-				userId,
-				customerName: dto.customerName,
-				address: dto.address,
-				phone: dto.phone,
-				totalCents: lines.reduce(
-					(sum, line) => sum + line.priceCents * line.quantity,
-					0,
-				),
-				items: { create: lines },
-			},
-			include: withItems,
+		// The order and its `order.placed` event commit together or not at all.
+		const order = await this.prisma.$transaction(async (tx) => {
+			const created = await tx.order.create({
+				data: {
+					userId,
+					customerName: dto.customerName,
+					address: dto.address,
+					phone: dto.phone,
+					totalCents: lines.reduce(
+						(sum, line) => sum + line.priceCents * line.quantity,
+						0,
+					),
+					items: { create: lines },
+				},
+				include: withItems,
+			});
+			await enqueueOrderEvent(tx, orderPlaced(created));
+			return created;
 		});
 
 		const view = toOrderView(order);
@@ -223,15 +227,24 @@ export class OrdersService {
 		from: OrderStatus,
 		to: OrderStatus,
 	): Promise<OrderView | null> {
-		const { count } = await this.prisma.order.updateMany({
-			where: { id, status: from },
-			data: { status: to },
+		const order = await this.prisma.$transaction(async (tx) => {
+			const { count } = await tx.order.updateMany({
+				where: { id, status: from },
+				data: { status: to },
+			});
+			if (count === 0) return null;
+			const updated = await tx.order.findUniqueOrThrow({
+				where: { id },
+				include: withItems,
+			});
+			await enqueueOrderEvent(tx, orderStatusChanged(updated, from, to));
+			return updated;
 		});
-		if (count === 0) return null;
+		if (!order) return null;
 		await this.invalidateOrder(id);
-		const order = await this.get(id);
-		await this.events.publish({ type: "updated", order });
-		return order;
+		const view = toOrderView(order);
+		await this.events.publish({ type: "updated", order: view });
+		return view;
 	}
 
 	private async invalidateOrder(id: string): Promise<void> {
