@@ -11,17 +11,66 @@ Turborepo monorepo (pnpm 12, Node 24+): a food-ordering feature with menu, cart,
 | `packages/query` | TanStack Query client/provider (localStorage persistence) + `useQuery`/`useMutation` wrappers |
 | `packages/form` | react-hook-form + Zod wrappers (`FormInput`, `FormTextarea`, ...) |
 
-## Setup
+## Running locally
+
+Requirements: Node 24+ (`node -v`), pnpm (`corepack enable`), Docker with Compose.
+
+### 1. Install dependencies
 
 ```sh
 pnpm install
-cp env/.env.example env/.env.development   # adjust if needed
-pnpm docker:development:up                 # whole stack in Docker, or:
-docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d postgres redis kafka
-pnpm prisma:deploy && pnpm dev             # run apps on the host
 ```
 
-Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`, Kafka `9094` (host listener). Host-run server and worker: `pnpm dev:server` and `pnpm dev:worker`.
+### 2. Create the env file
+
+```sh
+cp env/.env.example env/.env.development   # adjust if needed
+```
+
+### Option A — whole stack in Docker
+
+One command builds and starts postgres, redis, kafka, server, worker, app and admin:
+
+```sh
+pnpm docker:development:start   # = up -d --build
+```
+
+The server container generates the Prisma client, runs migrations and seeds demo data on first boot, then starts. Tail logs with `pnpm docker:development:logs`, stop with `pnpm docker:development:down` (use `:reset` to wipe the volumes), rebuild alone with `pnpm docker:development:build`.
+
+### Option B — apps on the host, infrastructure in Docker
+
+```sh
+# 1. infrastructure only
+docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d postgres redis kafka
+
+# 2. database
+pnpm prisma:generate
+pnpm prisma:deploy    # apply migrations
+pnpm prisma:seed      # optional: demo menu + accounts
+
+# 3. apps (pick what you need)
+pnpm dev              # server + app + admin together (turbo)
+pnpm dev:server       # API only
+pnpm dev:worker       # outbox relay + Kafka consumers
+pnpm dev:app          # customer app only
+pnpm dev:admin        # admin dashboard only
+```
+
+### URLs and ports
+
+All ports come from `env/.env.development`.
+
+| What | URL | Env var | Default |
+| --- | --- | --- | --- |
+| API (+ Swagger at `/api/v1/docs`) | http://localhost:8000/api/v1 | `SERVER_PORT` | `8000` |
+| Customer app | http://localhost:3000 | `APP_PORT` | `3000` |
+| Admin dashboard | http://localhost:3001 | `ADMIN_PORT` | `3001` |
+| Postgres | – | `POSTGRES_PORT` | `5434` |
+| Redis | – | `REDIS_PORT` | `6379` |
+| Kafka (host listener) | – | `KAFKA_PORT` | `9094` |
+
+Demo logins (from `env/.env.development`): customer `customer@example.com` / `Customer@12345`, admin `admin@example.com` / `Admin@12345`.
+
 ## Seed data
 
 `pnpm prisma:seed` (script: `apps/server/prisma/seed.ts`, compiled with `tsconfig.seed.json`) fills demo data and is safe to rerun: existing rows are never changed. The dev Docker stack runs it automatically after migrating.
