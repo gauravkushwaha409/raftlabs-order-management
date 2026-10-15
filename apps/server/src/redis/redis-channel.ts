@@ -1,16 +1,18 @@
 import {
+	Injectable,
 	Logger,
 	type OnModuleDestroy,
 	type OnModuleInit,
 } from "@nestjs/common";
 import type { Redis } from "ioredis";
 import { type Observable, Subject } from "rxjs";
-import type { RedisService } from "./service/redis.service.js";
+import { RedisService } from "./service/redis.service.js";
 
 /**
  * Typed fan-out over one Redis pub/sub channel, so every server instance sees events
  * regardless of which instance (or worker process) produced them.
  */
+@Injectable() // emits the constructor metadata subclasses inherit for DI
 export abstract class RedisChannel<T> implements OnModuleInit, OnModuleDestroy {
 	protected abstract readonly channel: string;
 	private readonly logger = new Logger(this.constructor.name);
