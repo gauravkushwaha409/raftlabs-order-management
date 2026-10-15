@@ -7,7 +7,7 @@ import { PrismaService } from "../../prisma/service/prisma.service.js";
 import {
 	REDIS_KEYS,
 	REDIS_TTL_SECONDS,
-} from "../../redis/constant/redis-keys.js";
+} from "../../common/constant/redis-keys.js";
 import { RedisService } from "../../redis/service/redis.service.js";
 import type { CreateMenuItem, UpdateMenuItem } from "../dto/menu.dto.js";
 

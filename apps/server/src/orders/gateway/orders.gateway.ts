@@ -5,6 +5,7 @@ import {
 	WebSocketServer,
 } from "@nestjs/websockets";
 import type { Namespace, Socket } from "socket.io";
+import { ROLES } from "../../common/constant/roles.js";
 import { AuthService } from "../../auth/service/auth.service.js";
 import { ACCESS_COOKIE } from "../../auth/types/auth.types.js";
 import { readCookie } from "../../auth/util/cookies.js";
@@ -40,7 +41,7 @@ export class OrdersGateway implements OnModuleInit, OnGatewayConnection {
 		const user = await this.auth.authenticate(
 			readCookie(client.handshake.headers.cookie, ACCESS_COOKIE),
 		);
-		if (user?.role !== "ADMIN") {
+		if (user?.role !== ROLES.ADMIN) {
 			client.emit("unauthorized");
 			client.disconnect(true);
 			return;

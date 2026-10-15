@@ -5,6 +5,7 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common";
 import { AuthGuard as PassportAuthGuard } from "@nestjs/passport";
+import { ROLES } from "../../common/constant/roles.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
 
 /** Requires a valid session cookie and attaches the user as `request.user`. */
@@ -24,7 +25,7 @@ export class AdminGuard extends AuthGuard {
 		await super.canActivate(context);
 		if (
 			context.switchToHttp().getRequest<AuthenticatedRequest>().user.role !==
-			"ADMIN"
+			ROLES.ADMIN
 		) {
 			throw new ForbiddenException("Admin access required");
 		}

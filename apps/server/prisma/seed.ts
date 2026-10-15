@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import * as dotenv from "dotenv";
 import { hashPassword } from "../src/auth/util/password.js";
+import { ROLES, type Role } from "../src/common/constant/roles.js";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 import { DEMO_ACCOUNTS, DEMO_ORDERS, MENU_SEED } from "./seed-data.js";
 
@@ -11,7 +12,6 @@ import { DEMO_ACCOUNTS, DEMO_ORDERS, MENU_SEED } from "./seed-data.js";
 //   production  → refuses unless ALLOW_PRODUCTION_SEED=true; then seeds the menu plus only the accounts whose
 //                 ADMIN_* / CUSTOMER_* credentials are set in env (never the well-known demo passwords)
 type SeedMode = "development" | "production";
-type Role = "ADMIN" | "CUSTOMER";
 
 function parseSeedMode(raw: string | undefined): SeedMode {
 	const value = (raw ?? "development").toLowerCase();
@@ -41,8 +41,8 @@ interface Account {
 
 /** Env wins; outside production the documented demo credentials fill any gap. Returns null when production has none. */
 function resolveAccount(role: Role): Account | null {
-	const key = role === "ADMIN" ? "ADMIN" : "CUSTOMER";
-	const demo = DEMO_ACCOUNTS[role === "ADMIN" ? "admin" : "customer"];
+	const key = role === ROLES.ADMIN ? "ADMIN" : "CUSTOMER";
+	const demo = DEMO_ACCOUNTS[role === ROLES.ADMIN ? "admin" : "customer"];
 	const useDemo = mode !== "production";
 	const email = (
 		process.env[`${key}_EMAIL`]?.trim() || (useDemo ? demo.email : "")
@@ -128,7 +128,7 @@ async function main() {
 	const menuCreated = await seedMenu();
 	const seeded: Account[] = [];
 	let customerId: string | undefined;
-	for (const role of ["ADMIN", "CUSTOMER"] as const) {
+	for (const role of [ROLES.ADMIN, ROLES.CUSTOMER]) {
 		const account = resolveAccount(role);
 		if (!account) {
 			console.warn(
@@ -137,7 +137,7 @@ async function main() {
 			continue;
 		}
 		const user = await seedAccount(account);
-		if (role === "CUSTOMER") customerId = user.id;
+		if (role === ROLES.CUSTOMER) customerId = user.id;
 		seeded.push(account);
 	}
 

@@ -2,7 +2,7 @@ import type { ApiError, ApiResponse } from "@package/api-client";
 import { useMutation } from "@package/query";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/config/query-keys";
-import type { User } from "@/types/api";
+import { ROLES, type User } from "@/types/api";
 import { authApiService } from "../../services/auth-api.service";
 import type { AuthTypes } from "../../types/auth-api.types";
 
@@ -12,7 +12,7 @@ export function useLoginMutation() {
 		async (credentials) => {
 			const response = await authApiService.login(credentials);
 			const user: User = response.data.data;
-			if (user.role !== "ADMIN") {
+			if (user.role !== ROLES.ADMIN) {
 				await authApiService.logout(); // do not leave a customer session behind
 				throw new Error("This account does not have admin access");
 			}

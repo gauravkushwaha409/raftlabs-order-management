@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import type { OrderStatus } from "../src/common/constant/order-status.js";
 import type {
 	MenuItem,
 	Order,
 	OrderItem,
 	User,
 } from "../src/generated/prisma/client.js";
-import type { OrderStatus } from "../src/orders/constant/order-status.js";
 
 type OrderRecord = Order & { items: OrderItem[] };
 type Where = {

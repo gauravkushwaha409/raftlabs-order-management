@@ -31,11 +31,19 @@ export interface OrderEvent {
 	order: Order;
 }
 
+/** Account roles, in one place. Mirrors the server's `Role` enum. */
+export const ROLES = {
+	ADMIN: "ADMIN",
+	CUSTOMER: "CUSTOMER",
+} as const;
+
+export type Role = (typeof ROLES)[keyof typeof ROLES];
+
 export interface User {
 	id: string;
 	email: string;
 	name: string;
-	role: "CUSTOMER" | "ADMIN";
+	role: Role;
 }
 
 export interface MenuItem {

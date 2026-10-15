@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import type { Role } from "../../generated/prisma/enums.js";
+import type { Role } from "../../common/constant/roles.js";
 
 export interface AuthUser {
 	id: string;

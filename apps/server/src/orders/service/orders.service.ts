@@ -15,19 +15,20 @@ import {
 	switchMap,
 	takeWhile,
 } from "rxjs";
+import { ROLES } from "../../common/constant/roles.js";
 import type { AuthUser } from "../../auth/types/auth.types.js";
 import { PrismaService } from "../../prisma/service/prisma.service.js";
 import {
 	REDIS_KEYS,
 	REDIS_TTL_SECONDS,
-} from "../../redis/constant/redis-keys.js";
+} from "../../common/constant/redis-keys.js";
 import { RedisService } from "../../redis/service/redis.service.js";
 import {
 	canTransition,
 	isFinalStatus,
 	nextStatus,
 	type OrderStatus,
-} from "../constant/order-status.js";
+} from "../../common/constant/order-status.js";
 import type { CreateOrderDto } from "../dto/order.dto.js";
 import { type OrderView, toOrderView } from "../dto/order.view.js";
 import { OrderEventsService } from "./order-events.service.js";
@@ -110,7 +111,7 @@ export class OrdersService {
 	/** An order as seen by `user`: owners and admins see it, everyone else gets the same 404 as a missing id. */
 	async getFor(user: AuthUser, id: string): Promise<OrderView> {
 		const entry = await this.readOrder(id);
-		if (!entry || (user.role !== "ADMIN" && entry.userId !== user.id)) {
+		if (!entry || (user.role !== ROLES.ADMIN && entry.userId !== user.id)) {
 			throw new NotFoundException(`Order ${id} not found`);
 		}
 		return entry.view;

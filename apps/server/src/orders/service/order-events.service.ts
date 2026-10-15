@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import type { Redis } from "ioredis";
 import { type Observable, Subject } from "rxjs";
-import { REDIS_CHANNELS } from "../../redis/constant/redis-keys.js";
+import { REDIS_CHANNELS } from "../../common/constant/redis-keys.js";
 import { RedisService } from "../../redis/service/redis.service.js";
 import type { OrderView } from "../dto/order.view.js";
 

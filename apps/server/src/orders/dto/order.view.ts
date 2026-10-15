@@ -1,5 +1,5 @@
 import type { Order, OrderItem } from "../../generated/prisma/client.js";
-import type { OrderStatus } from "../constant/order-status.js";
+import type { OrderStatus } from "../../common/constant/order-status.js";
 
 export interface OrderItemView {
 	menuItemId: string;

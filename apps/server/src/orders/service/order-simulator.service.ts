@@ -4,7 +4,7 @@ import {
 	type OnModuleDestroy,
 } from "@nestjs/common";
 import { Subscription } from "rxjs";
-import { isFinalStatus, type OrderStatus } from "../constant/order-status.js";
+import { isFinalStatus, type OrderStatus } from "../../common/constant/order-status.js";
 import { OrderEventsService } from "./order-events.service.js";
 import { OrdersService } from "./orders.service.js";
 

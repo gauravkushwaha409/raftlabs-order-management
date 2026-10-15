@@ -1,7 +1,7 @@
 import { ApiError } from "@package/api-client";
 import { useQuery } from "@package/query";
 import { QUERY_KEYS } from "@/config/query-keys";
-import type { User } from "@/types/api";
+import { ROLES, type User } from "@/types/api";
 import { authApiService } from "../../services/auth-api.service";
 
 const SESSION_STALE_MS = 60_000;
@@ -14,6 +14,6 @@ export const useAdminQuery = () =>
 		undefined,
 		{
 			staleTime: SESSION_STALE_MS,
-			select: (user) => (user?.role === "ADMIN" ? user : null),
+			select: (user) => (user?.role === ROLES.ADMIN ? user : null),
 		},
 	);
