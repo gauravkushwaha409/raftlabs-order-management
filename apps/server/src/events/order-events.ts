@@ -45,6 +45,14 @@ export const orderEventSchema = z.discriminatedUnion("type", [
 
 export type OrderDomainEvent = z.infer<typeof orderEventSchema>;
 
+const KNOWN_TYPES = new Set<string>(
+	orderEventSchema.options.map((option) => option.shape.type.value),
+);
+
+/** Lets a consumer skip event types added by a newer producer instead of dead-lettering them during a rolling deploy. */
+export const isKnownOrderEventType = (type: unknown) =>
+	typeof type === "string" && KNOWN_TYPES.has(type);
+
 type PlacedOrder = Pick<Order, "id" | "userId" | "totalCents"> & {
 	items: Array<{ quantity: number }>;
 };
