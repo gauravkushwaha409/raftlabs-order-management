@@ -23,6 +23,7 @@ const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
 					title: "typo-t3 font-semibold text-gray-800",
 					description: "typo-t4 text-gray-500",
 					closeButton: "bg-transparent! cursor-pointer order-last size-5! ml-auto",
+					default: "bg-white-base! border-gray-200!",
 					success: "bg-white-base! border-gray-200! ",
 					...toastOptions?.classNames,
 				},

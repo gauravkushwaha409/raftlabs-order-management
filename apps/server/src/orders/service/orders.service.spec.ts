@@ -342,4 +342,61 @@ describe("OrdersService", () => {
 			).rejects.toBeInstanceOf(NotFoundException);
 		});
 	});
+
+	describe("outbox", () => {
+		it("records order.placed together with the order", async () => {
+			const { prisma, service, pizza } = await setup();
+			const order = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 3 }],
+			});
+
+			expect(prisma.outbox).toHaveLength(1);
+			expect(prisma.outbox[0]).toMatchObject({
+				type: "order.placed",
+				aggregateId: order.id,
+				payload: {
+					type: "order.placed",
+					data: {
+						orderId: order.id,
+						userId: USER_ID,
+						totalCents: 3000,
+						itemCount: 3,
+					},
+				},
+			});
+		});
+
+		it("records one order.status_changed per successful transition", async () => {
+			const { prisma, service, pizza } = await setup();
+			const order = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 1 }],
+			});
+			await service.updateStatus(order.id, "PREPARING");
+
+			expect(prisma.outbox.map((event) => event.type)).toEqual([
+				"order.placed",
+				"order.status_changed",
+			]);
+			expect(prisma.outbox[1]?.payload).toMatchObject({
+				data: { orderId: order.id, from: "RECEIVED", to: "PREPARING" },
+			});
+		});
+
+		it("records nothing when the transition loses the race", async () => {
+			const { prisma, service, pizza } = await setup();
+			const order = await service.create(USER_ID, {
+				...customer,
+				items: [{ menuItemId: pizza.id, quantity: 1 }],
+			});
+			await service.advance(order.id, "RECEIVED");
+			const eventsBefore = prisma.outbox.length;
+
+			const stale = await service.advance(order.id, "RECEIVED");
+
+			expect(stale?.advanced).toBe(false);
+			expect(prisma.outbox).toHaveLength(eventsBefore);
+		});
+	});
 });

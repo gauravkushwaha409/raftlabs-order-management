@@ -9,6 +9,12 @@ export const ENDPOINTS = {
 	MENU: {
 		LIST: "/menu",
 	},
+	NOTIFICATIONS: {
+		LIST: "/notifications",
+		STREAM: "/notifications/stream",
+		READ: (notificationId: string) => `/notifications/${notificationId}/read`,
+		READ_ALL: "/notifications/read-all",
+	},
 	ORDERS: {
 		CREATE: "/orders",
 		MINE: "/orders/mine",

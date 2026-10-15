@@ -56,3 +56,17 @@ export interface User {
 	name: string;
 	role: Role;
 }
+
+export interface Notification {
+	id: string;
+	orderId: string;
+	title: string;
+	body: string;
+	read: boolean;
+	createdAt: string;
+}
+
+export interface NotificationFeed {
+	items: Notification[];
+	unreadCount: number;
+}

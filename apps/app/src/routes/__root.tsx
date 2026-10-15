@@ -7,6 +7,7 @@ import {
 import { UtensilsCrossedIcon } from "lucide-react";
 import { AuthMenu } from "@/features/auth/auth-menu";
 import { CartSheet } from "@/features/cart/cart-sheet";
+import { NotificationBell } from "@/features/notifications/notification-bell";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 	{
@@ -25,6 +26,7 @@ function RootLayout() {
 					</Link>
 					<div className="flex items-center gap-3">
 						<AuthMenu />
+						<NotificationBell />
 						<CartSheet />
 					</div>
 				</div>

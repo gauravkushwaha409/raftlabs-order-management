@@ -4,8 +4,8 @@ Turborepo monorepo (pnpm 12, Node 24+): a food-ordering feature with menu, cart,
 
 | Path | What |
 | --- | --- |
-| `apps/server` | NestJS 12 REST API (`/api/v1`, Swagger at `/api/v1/docs`), Prisma 7 + Postgres, Redis pub/sub, SSE + socket.io, Zod validation |
-| `apps/app` | Customer app: menu, cart, sign-up/sign-in, checkout, my orders, live order tracking (React 19, Vite 8, TanStack Router/Query, Zustand, Tailwind 4) |
+| `apps/server` | NestJS 12 REST API (`/api/v1`, Swagger at `/api/v1/docs`), Prisma 7 + Postgres, Redis pub/sub, SSE + socket.io, Zod validation. Also runs as a **worker** (outbox relay + Kafka consumers) |
+| `apps/app` | Customer app: menu, cart, sign-up/sign-in, checkout, my orders, live order tracking, notification bell (React 19, Vite 8, TanStack Router/Query, Zustand, Tailwind 4) |
 | `apps/admin` | Admin dashboard: sign-in, live orders table, status updates, delete (admin accounts only) |
 | `packages/ui` | shadcn-based design system + Tailwind theme (`@package/ui/global.css`), lucide icons |
 | `packages/query` | TanStack Query client/provider (localStorage persistence) + `useQuery`/`useMutation` wrappers |
@@ -17,11 +17,11 @@ Turborepo monorepo (pnpm 12, Node 24+): a food-ordering feature with menu, cart,
 pnpm install
 cp env/.env.example env/.env.development   # adjust if needed
 pnpm docker:development:up                 # whole stack in Docker, or:
-docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d postgres redis
+docker compose --env-file env/.env.development -f docker/docker-compose.development.yml up -d postgres redis kafka
 pnpm prisma:deploy && pnpm dev             # run apps on the host
 ```
 
-Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`.
+Ports: server `8000`, app `3000`, admin `3001`, Postgres `5434`, Redis `6379`, Kafka `9094` (host listener). Host-run server and worker: `pnpm dev:server` and `pnpm dev:worker`.
 ## Seed data
 
 `pnpm prisma:seed` (script: `apps/server/prisma/seed.ts`, compiled with `tsconfig.seed.json`) fills demo data and is safe to rerun: existing rows are never changed. The dev Docker stack runs it automatically after migrating.
@@ -61,6 +61,10 @@ Override credentials with `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `CUSTOMER_EMAIL` / 
 | GET | `/orders/mine` | user | The caller's orders, newest first |
 | GET | `/orders/:id` | owner or admin | 404 for anyone else |
 | GET | `/orders/:id/events` | owner or admin | **SSE**: `order` events with the full order, `ping` keep-alive; completes on `DELIVERED`/`CANCELLED` |
+| GET | `/notifications` | user | `{ items, unreadCount }`, newest first (last 50) |
+| GET | `/notifications/stream` | user | **SSE**: a `notification` event per new notification, `ping` keep-alive |
+| PATCH | `/notifications/:id/read` | owner | 204; 404 for anyone else's |
+| POST | `/notifications/read-all` | user | 204 |
 | GET | `/orders?status=&limit=` | admin | All orders, newest first |
 | PATCH | `/orders/:id/status` | admin | `{ status }`; 409 on an invalid transition |
 | DELETE | `/orders/:id` | admin | 204 |
@@ -78,14 +82,38 @@ Status flow: `RECEIVED → PREPARING → OUT_FOR_DELIVERY → DELIVERED`; `CANCE
 - Writes invalidate: every menu mutation drops `menu:list`; every order write drops its `order:{id}`. Cache failures never fail a request — the DB stays the authority and the TTL bounds staleness.
 - Order lists are deliberately uncached (combinatorial keys, live sockets already keep them fresh).
 
+## Events and notifications (Kafka)
+
+```
+API ── tx: order + outbox row ──▶ Postgres
+                                    │  worker: outbox relay (one active, advisory lock)
+                                    ▼
+                         Kafka  orders.events.v1  (key = orderId, N partitions)
+                                    │  consumer group "notifications" (scale to N workers)
+                                    ▼
+              Notification row (unique eventId) ─▶ Redis ─▶ API instance ─▶ SSE ─▶ bell + toast
+                                    ╰─ poison / exhausted retries ─▶ orders.events.v1.dlq
+```
+
+- **Outbox, not dual writes.** Creating an order or changing its status writes the state *and* an `OutboxEvent` row in one transaction (`order.placed`, `order.status_changed`). Nothing is lost if Kafka is down, and no event exists for a change that rolled back. The API never talks to Kafka, so it stays up when the broker is down.
+- **Worker process** (`apps/server/src/worker.ts`, `WorkerModule`): the outbox relay publishes rows in insertion order and deletes them; consumers run here too. It is the same image as the API with another command, so it scales on its own: `docker compose ... up -d --scale worker=3`.
+- **Ordering.** The Kafka key is the order id, so one order's events stay in order. The relay holds a Postgres advisory lock per batch, so exactly one relay publishes at a time (others are hot spares) and cross-relay reordering cannot happen.
+- **Delivery is at-least-once, handlers are idempotent.** A crash between send and commit re-sends a batch, and Kafka may redeliver. `Notification.eventId` is unique, so a repeat is a no-op and the customer is notified once. The producer is idempotent with `acks=all`; offsets are committed only after the handler (or the dead-letter write) finished.
+- **Failures.** Transient errors retry with exponential backoff (5 attempts). Malformed messages, or known event types with an invalid payload, go straight to `orders.events.v1.dlq` with the error, source partition/offset and attempt count in headers. Event types a newer producer adds are skipped, not dead-lettered, so rolling deploys are safe. If even the dead-letter write fails the worker exits and the orchestrator restarts it; the message is redelivered.
+- **Scaling.** Parallelism per consumer group is bounded by the partition count (`KAFKA_PARTITIONS`, default 3, fixed when the topic is created; raise it with `kafka-topics.sh --alter` later). A new consumer group (analytics, email, ...) subscribes to the same topic without touching the producer: add a handler next to `NotificationsConsumer`.
+- **Contract.** Events are versioned zod schemas in `apps/server/src/events/order-events.ts`; a breaking change becomes `orders.events.v2` with both versions served while consumers migrate.
+- **Delivery to the browser.** The consumer stores the notification, then publishes it on Redis; the API instance that holds the user's SSE stream forwards it. Missed pushes are covered by `GET /notifications` on load.
+
+Operate it: inspect the dead-letter topic with `kafka-console-consumer.sh --topic orders.events.v1.dlq --from-beginning --property print.headers=true` inside the `kafka` container, and lag with `kafka-consumer-groups.sh --describe --group notifications`. The compose broker is a single node for development and small deployments; point `KAFKA_BROKERS` at a managed or multi-broker cluster (and raise `KAFKA_REPLICATION_FACTOR`) for real production traffic.
+
 ## Commands
 
 `pnpm dev | build | test | check-types | check` · `pnpm --filter server test:e2e` · `pnpm prisma:migrate | deploy | studio` · `pnpm docker:<development|production>:<build|up|start|down|logs>`
 
 ## Tests (Vitest everywhere)
 
-- Server: unit tests (order rules, service, simulator, auth, passwords, cookies, menu) and HTTP e2e tests (validation, CRUD, sessions, ownership and roles, status rules, SSE, admin websocket) run against in-memory Prisma/Redis fakes in `apps/server/test/fakes.ts`. No database needed.
-- Apps: Testing Library + jsdom (menu, cart store, login/register/checkout validation, redirect safety, order tracker + SSE hook, admin table, admin login).
+- Server: unit tests (order rules, service + outbox, simulator, auth, passwords, cookies, menu, retry/dead-letter policy, outbox relay, notifications service and consumer) and HTTP e2e tests (validation, CRUD, sessions, ownership and roles, status rules, SSE, admin websocket, and the whole order → outbox → Kafka → notification path) run against in-memory Prisma/Redis/Kafka fakes in `apps/server/test/`. No database or broker needed.
+- Apps: Testing Library + jsdom (menu, cart store, login/register/checkout validation, redirect safety, order tracker + SSE hook, notification feed + hook, admin table, admin login).
 
 ## Notes
 

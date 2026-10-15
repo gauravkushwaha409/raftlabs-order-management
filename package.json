@@ -11,6 +11,7 @@
 		"dev:app": "turbo dev --filter app",
 		"dev:admin": "turbo dev --filter admin",
 		"dev:server": "turbo dev --filter server",
+		"dev:worker": "pnpm --filter server dev:worker",
 		"build": "turbo build",
 		"test": "turbo test",
 		"check-types": "turbo run check-types",

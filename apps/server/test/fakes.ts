@@ -3,8 +3,10 @@ import { EventEmitter } from "node:events";
 import type { OrderStatus } from "../src/common/constant/order-status.js";
 import type {
 	MenuItem,
+	Notification,
 	Order,
 	OrderItem,
+	OutboxEvent,
 	User,
 } from "../src/generated/prisma/client.js";
 
@@ -55,6 +57,8 @@ export class FakePrisma {
 	users: User[] = [];
 	/** Raw SQL issued through $queryRaw, in order (used to assert row locks). */
 	rawQueries: string[] = [];
+	/** Set false to simulate another relay holding the advisory lock. */
+	advisoryLockGranted = true;
 
 	async $queryRaw(query: TemplateStringsArray, ...values: unknown[]) {
 		let sql = query[0] ?? "";
@@ -62,12 +66,99 @@ export class FakePrisma {
 			sql += String(value) + (query[index + 1] ?? "");
 		});
 		this.rawQueries.push(sql);
-		return [];
+		// The outbox relay's advisory lock is the one raw query whose result matters.
+		return sql.includes("pg_try_advisory_xact_lock")
+			? [{ locked: this.advisoryLockGranted }]
+			: [];
 	}
 
 	async $transaction<T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> {
 		return fn(this);
 	}
+
+	outbox: OutboxEvent[] = [];
+	notifications: Notification[] = [];
+
+	outboxEvent = {
+		create: async ({
+			data,
+		}: {
+			data: Pick<OutboxEvent, "id" | "type" | "aggregateId"> & {
+				payload: unknown;
+			};
+		}) => {
+			const event = {
+				seq: this.outbox.length + 1,
+				createdAt: new Date(),
+				...data,
+			} as OutboxEvent;
+			this.outbox.push(event);
+			return event;
+		},
+		findMany: async ({ take }: { take?: number } = {}) =>
+			[...this.outbox].sort((a, b) => a.seq - b.seq).slice(0, take),
+		deleteMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+			const before = this.outbox.length;
+			this.outbox = this.outbox.filter((event) => !where.id.in.includes(event.id));
+			return { count: before - this.outbox.length };
+		},
+	};
+
+	notification = {
+		create: async ({
+			data,
+		}: {
+			data: Pick<
+				Notification,
+				"eventId" | "userId" | "orderId" | "title" | "body"
+			>;
+		}) => {
+			if (this.notifications.some((row) => row.eventId === data.eventId))
+				throw Object.assign(new Error("Unique constraint failed"), {
+					code: "P2002",
+				});
+			const row: Notification = {
+				id: randomUUID(),
+				readAt: null,
+				createdAt: new Date(),
+				...data,
+			};
+			this.notifications.push(row);
+			return row;
+		},
+		findMany: async ({
+			where,
+			take,
+		}: {
+			where: { userId: string };
+			take?: number;
+		}) =>
+			this.notifications
+				.filter((row) => row.userId === where.userId)
+				.reverse() // newest insert first, so equal timestamps still sort newest-first
+				.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+				.slice(0, take),
+		count: async ({ where }: { where: { userId: string; readAt: null } }) =>
+			this.notifications.filter(
+				(row) => row.userId === where.userId && row.readAt === null,
+			).length,
+		updateMany: async ({
+			where,
+			data,
+		}: {
+			where: { userId: string; id?: string; readAt?: null };
+			data: { readAt: Date };
+		}) => {
+			const targets = this.notifications.filter(
+				(row) =>
+					row.userId === where.userId &&
+					(where.readAt === undefined || row.readAt === null) &&
+					(where.id === undefined || row.id === where.id),
+			);
+			for (const row of targets) row.readAt = data.readAt;
+			return { count: targets.length };
+		},
+	};
 
 	user = {
 		findUnique: async ({ where }: { where: { id?: string; email?: string } }) =>
@@ -190,6 +281,11 @@ export class FakePrisma {
 				.map((order) => pick(order, select)),
 		findUnique: async ({ where }: { where: { id: string } }) =>
 			this.orders.find((order) => order.id === where.id) ?? null,
+		findUniqueOrThrow: async ({ where }: { where: { id: string } }) => {
+			const order = this.orders.find((row) => row.id === where.id);
+			if (!order) throw new Error(`Order ${where.id} not found`);
+			return order;
+		},
 		updateMany: async ({
 			where,
 			data,
